@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase 3: resume Phase 2 (model_12999) with action-latency DR (0-40 ms per episode).
+# Phase 3: resume Phase 2 (model_12999) with action-latency DR (0-20 ms per episode).
 set -euo pipefail
 
 cd /home/luke/nvidia/unitree/unitree_rl_mjlab

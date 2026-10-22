@@ -20,8 +20,9 @@ from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
 from src.tasks.velocity.mdp import delayed_effort_limits
 from src.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
 
-# Max action latency in physics steps (sim dt = 0.005 s -> 40 ms).
-G1_23DOF_MAX_ACTION_LAG = 8
+# Max action latency in physics steps (sim dt = 0.005 s -> 20 ms).
+# 0-40 ms (lag 8) collapsed forward walking to ~0.25 m/s; see tag phase3a-lag0-40ms-collapsed.
+G1_23DOF_MAX_ACTION_LAG = 4
 
 
 def unitree_g1_23dof_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
