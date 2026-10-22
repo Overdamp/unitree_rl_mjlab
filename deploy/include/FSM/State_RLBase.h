@@ -14,13 +14,21 @@ public:
     
     void enter()
     {
-        // set gain
+        // set gain (clear unused motor slots first, then map active joints via joint_ids_map)
+        for (auto & motor : lowcmd->msg_.motor_cmd())
+        {
+            motor.kp() = 0;
+            motor.kd() = 0;
+            motor.dq() = 0;
+            motor.tau() = 0;
+        }
         for (int i = 0; i < env->robot->data.joint_stiffness.size(); ++i)
         {
-            lowcmd->msg_.motor_cmd()[i].kp() = env->robot->data.joint_stiffness[i];
-            lowcmd->msg_.motor_cmd()[i].kd() = env->robot->data.joint_damping[i];
-            lowcmd->msg_.motor_cmd()[i].dq() = 0;
-            lowcmd->msg_.motor_cmd()[i].tau() = 0;
+            int motor_id = env->robot->data.joint_ids_map[i];
+            lowcmd->msg_.motor_cmd()[motor_id].kp() = env->robot->data.joint_stiffness[i];
+            lowcmd->msg_.motor_cmd()[motor_id].kd() = env->robot->data.joint_damping[i];
+            lowcmd->msg_.motor_cmd()[motor_id].dq() = 0;
+            lowcmd->msg_.motor_cmd()[motor_id].tau() = 0;
         }
 
         env->robot->update();

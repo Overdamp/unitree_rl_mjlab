@@ -32,7 +32,7 @@ struct ArticulationData
     Eigen::Vector3f root_ang_vel_b;
 
     // Projection of the gravity direction on base frame.
-    Eigen::Vector3f projected_gravity_b;
+    Eigen::Vector3f projected_gravity_b = Eigen::Vector3f(0.0f, 0.0f, -1.0f);
 
     Eigen::Quaternionf root_quat_w;
 

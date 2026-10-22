@@ -24,7 +24,8 @@ public:
 
     void enter()
     {
-        // set gain
+        // Zero-Kp Pure Viscous Damping: cut position stiffness immediately (kp = 0)
+        // and apply proportional joint damping (kd) from config.yaml.
         static auto kd = param::config["FSM"]["Passive"]["kd"].as<std::vector<float>>();
         for(int i(0); i < kd.size(); ++i)
         {

@@ -9,6 +9,10 @@
 class FSMState : public BaseState
 {
 public:
+    // Keyboard mode switching is enabled by the G1 entry point only for loopback
+    // simulation. This prevents these shortcuts from becoming active on a robot NIC.
+    inline static bool keyboard_fsm_shortcuts_enabled = false;
+
     FSMState(int state, std::string state_string) 
     : BaseState(state, state_string) 
     {
@@ -41,6 +45,31 @@ public:
                         fsm_id
                     )
                 );
+
+                // Laptop-keyboard shortcuts for local simulation. The existing
+                // joystick transition remains available when a gamepad is used.
+                std::string keyboard_key;
+                if (state_string == "Passive" && target_fsm == "FixStand") {
+                    keyboard_key = "u";
+                } else if (state_string == "FixStand" && target_fsm == "Velocity") {
+                    keyboard_key = "v";
+                } else if ((state_string == "FixStand" || state_string == "Velocity") &&
+                           target_fsm == "Passive") {
+                    keyboard_key = "p";
+                }
+                if (!keyboard_key.empty()) {
+                    registered_checks.emplace_back(
+                        std::make_pair(
+                            [keyboard_key]()->bool {
+                                return FSMState::keyboard_fsm_shortcuts_enabled &&
+                                       FSMState::keyboard &&
+                                       FSMState::keyboard->on_pressed &&
+                                       FSMState::keyboard->key() == keyboard_key;
+                            },
+                            fsm_id
+                        )
+                    );
+                }
             }
         }
 

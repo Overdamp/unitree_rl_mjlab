@@ -6,9 +6,11 @@ from src.assets.robots import (
 )
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs import mdp as envs_mdp
+from mjlab.envs.mdp import dr
 from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.managers.event_manager import EventTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
+from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.sensor import ContactMatch, ContactSensorCfg, RayCastSensorCfg
 from mjlab.tasks.velocity import mdp
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
@@ -82,6 +84,68 @@ def unitree_g1_23dof_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
   cfg.events["foot_friction"].params["asset_cfg"].geom_names = geom_names
   cfg.events["base_com"].params["asset_cfg"].body_names = ("torso_link",)
+
+  # Phase 2 Sim-to-Real Domain Randomization:
+  # 1. Randomize torso mass payload (-1.0 to +3.5 kg) to cover real battery/hardware mass (~34.1-35.0 kg total).
+  cfg.events["torso_mass_payload"] = EventTermCfg(
+    mode="startup",
+    func=dr.body_mass,
+    params={
+      "asset_cfg": SceneEntityCfg("robot", body_names=("torso_link",)),
+      "operation": "add",
+      "ranges": (-1.0, 3.5),
+    },
+  )
+  # 2. Scale pelvis, leg, and arm link masses by +-10%.
+  cfg.events["limb_mass_scale"] = EventTermCfg(
+    mode="startup",
+    func=dr.body_mass,
+    params={
+      "asset_cfg": SceneEntityCfg("robot", body_names=(r"^(?!torso_link$).*",)),
+      "operation": "scale",
+      "ranges": (0.90, 1.10),
+    },
+  )
+  # 3. Randomize static joint friction loss (0.0 to 0.30) to cover planetary gear / 4-bar linkage stiction (0.2 in scene_g1_23dof.xml).
+  cfg.events["joint_friction"] = EventTermCfg(
+    mode="startup",
+    func=dr.joint_friction,
+    params={
+      "asset_cfg": SceneEntityCfg("robot", joint_names=(".*",)),
+      "operation": "abs",
+      "ranges": (0.0, 0.30),
+    },
+  )
+  # 4. Randomize viscous joint damping (0.0 to 0.10) to cover mechanical damping (0.05 in scene_g1_23dof.xml).
+  cfg.events["joint_damping"] = EventTermCfg(
+    mode="startup",
+    func=dr.joint_damping,
+    params={
+      "asset_cfg": SceneEntityCfg("robot", joint_names=(".*",)),
+      "operation": "abs",
+      "ranges": (0.0, 0.10),
+    },
+  )
+  # 5. Randomize actuator PD gains (+-15%) and effort limits (85% to 105%) for battery voltage & thermal variation.
+  cfg.events["motor_pd_gains"] = EventTermCfg(
+    mode="startup",
+    func=dr.pd_gains,
+    params={
+      "asset_cfg": SceneEntityCfg("robot"),
+      "operation": "scale",
+      "kp_range": (0.85, 1.15),
+      "kd_range": (0.85, 1.15),
+    },
+  )
+  cfg.events["motor_effort_limits"] = EventTermCfg(
+    mode="startup",
+    func=dr.effort_limits,
+    params={
+      "asset_cfg": SceneEntityCfg("robot"),
+      "operation": "scale",
+      "effort_limit_range": (0.85, 1.05),
+    },
+  )
 
   # Rationale for std values:
   # - Knees/hip_pitch get the loosest std to allow natural leg bending during stride.

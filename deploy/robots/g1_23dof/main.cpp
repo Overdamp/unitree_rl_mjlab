@@ -6,7 +6,7 @@
 
 std::unique_ptr<LowCmd_t> FSMState::lowcmd = nullptr;
 std::shared_ptr<LowState_t> FSMState::lowstate = nullptr;
-std::shared_ptr<Keyboard> FSMState::keyboard = nullptr;
+std::shared_ptr<Keyboard> FSMState::keyboard = std::make_shared<Keyboard>();
 
 void init_fsm_state()
 {
@@ -29,6 +29,8 @@ int main(int argc, char** argv)
 {
     // Load parameters
     auto vm = param::helper(argc, argv);
+    FSMState::keyboard_fsm_shortcuts_enabled =
+        (vm["network"].as<std::string>() == "lo");
 
     std::cout << " --- Unitree Robotics --- \n";
     std::cout << "     G1-23dof Controller \n";
@@ -51,6 +53,12 @@ int main(int argc, char** argv)
     std::cout << "Press [L2 + Up] to enter FixStand mode.\n";
     std::cout << "And then press [R2 + A] to start controlling the robot.\n";
     std::cout << "And then press [R1 + A/B/Y/X] to control the robot dance.\n";
+    if (FSMState::keyboard_fsm_shortcuts_enabled) {
+        std::cout << "Simulation keyboard: [u] FixStand, [v] Velocity, [p] Passive.\n";
+        std::cout << "Keyboard FSM shortcuts are enabled only with --network=lo.\n";
+        std::cout << "Startup: Pause MuJoCo, Load key 0 (stand_ready), press [u] then [v] here, then Run MuJoCo.\n";
+        std::cout << "Velocity keys: [w/s/a/d] move, [q/e] turn, [x/space] zero velocity. Commands stay active until changed.\n";
+    }
 
     while (true)
     {

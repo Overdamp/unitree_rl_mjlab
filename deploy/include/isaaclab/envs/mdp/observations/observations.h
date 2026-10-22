@@ -122,7 +122,8 @@ REGISTER_OBSERVATION(velocity_commands)
     return obs;
 }
 
-REGISTER_OBSERVATION(gait_phase)
+inline std::vector<float> gait_phase_from_command(
+    ManagerBasedRLEnv* env, YAML::Node params, const std::vector<float>& cmd)
 {
     float period = params["period"].as<float>();
     float delta_phase = env->step_dt * (1.0f / period);
@@ -130,7 +131,6 @@ REGISTER_OBSERVATION(gait_phase)
     env->global_phase += delta_phase;
     env->global_phase = std::fmod(env->global_phase, 1.0f);
 
-    auto cmd = isaaclab::mdp::velocity_commands(env, params);
     float cmd_norm = std::sqrt(
         cmd[0] * cmd[0] +
         cmd[1] * cmd[1] +
@@ -148,6 +148,11 @@ REGISTER_OBSERVATION(gait_phase)
     }
 
     return obs;
+}
+
+REGISTER_OBSERVATION(gait_phase)
+{
+    return gait_phase_from_command(env, params, velocity_commands(env, params));
 }
 
 }

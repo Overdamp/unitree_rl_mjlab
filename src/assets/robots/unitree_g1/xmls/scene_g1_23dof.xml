@@ -236,8 +236,8 @@
     <motor name="right_hip_roll" joint="right_hip_roll_joint" ctrlrange="-139 139" />
     <motor name="right_hip_yaw" joint="right_hip_yaw_joint" ctrlrange="-88 88" />
     <motor name="right_knee" joint="right_knee_joint" ctrlrange="-139 139" />
-    <motor name="right_ankle_pitch" joint="right_ankle_pitch_joint" ctrlrange="-25 25" />
-    <motor name="right_ankle_roll" joint="right_ankle_roll_joint" ctrlrange="-25 25" />
+    <motor name="right_ankle_pitch" joint="right_ankle_pitch_joint" ctrlrange="-50 50" />
+    <motor name="right_ankle_roll" joint="right_ankle_roll_joint" ctrlrange="-50 50" />
     <motor name="waist_yaw" joint="waist_yaw_joint" ctrlrange="-88 88" />
     <motor name="waist_roll" joint="waist_roll_joint" ctrlrange="-50 50" />
     <motor name="waist_pitch" joint="waist_pitch_joint" ctrlrange="-50 50" />
@@ -372,4 +372,16 @@
     <light pos="1 0 3.5" dir="0 0 -1" directional="true"/>
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
   </worldbody>
+  <!-- Load key 0 while paused, enter FixStand then Velocity, then Run. This is the
+       nominal pose from the G1 velocity deploy.yaml; ordinary Reset is unchanged. -->
+  <keyframe>
+    <key name="stand_ready" qpos="
+      0 0 0.793 1 0 0 0
+      -0.1 0 0 0.3 -0.2 0
+      -0.1 0 0 0.3 -0.2 0
+      0
+      0.35 0.18 0 0.87 0
+      0.35 -0.18 0 0.87 0
+      0 0 0 0 0 0"/>
+  </keyframe>
 </mujoco>
