@@ -1,5 +1,8 @@
 """Unitree G1-23DOF velocity environment configurations."""
 
+from dataclasses import replace
+
+from mjlab.actuator import DelayedActuatorCfg
 from src.assets.robots import (
   G1_23DOF_ACTION_SCALE,
   get_g1_23dof_robot_cfg,
@@ -14,7 +17,11 @@ from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.sensor import ContactMatch, ContactSensorCfg, RayCastSensorCfg
 from mjlab.tasks.velocity import mdp
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
+from src.tasks.velocity.mdp import delayed_effort_limits
 from src.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
+
+# Max action latency in physics steps (sim dt = 0.005 s -> 40 ms).
+G1_23DOF_MAX_ACTION_LAG = 8
 
 
 def unitree_g1_23dof_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
@@ -25,7 +32,24 @@ def unitree_g1_23dof_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.sim.contact_sensor_maxmatch = 500
   cfg.sim.nconmax = 48
 
-  cfg.scene.entities = {"robot": get_g1_23dof_robot_cfg()}
+  # Wrap every actuator so its position target can be delayed. Lags are held fixed
+  # (hold_prob=1.0) and only set per episode by the "action_delay" reset event.
+  robot_cfg = get_g1_23dof_robot_cfg()
+  assert robot_cfg.articulation is not None
+  robot_cfg.articulation = replace(
+    robot_cfg.articulation,
+    actuators=tuple(
+      DelayedActuatorCfg(
+        base_cfg=actuator,
+        delay_target="position",
+        delay_min_lag=0,
+        delay_max_lag=G1_23DOF_MAX_ACTION_LAG,
+        delay_hold_prob=1.0,
+      )
+      for actuator in robot_cfg.articulation.actuators
+    ),
+  )
+  cfg.scene.entities = {"robot": robot_cfg}
 
   # Set raycast sensor frame to G1-23DOF pelvis.
   for sensor in cfg.scene.sensors or ():
@@ -139,11 +163,25 @@ def unitree_g1_23dof_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   )
   cfg.events["motor_effort_limits"] = EventTermCfg(
     mode="startup",
-    func=dr.effort_limits,
+    # Same as dr.effort_limits, but accepts the Phase 3 DelayedActuator wrappers.
+    func=delayed_effort_limits,
     params={
       "asset_cfg": SceneEntityCfg("robot"),
       "operation": "scale",
       "effort_limit_range": (0.85, 1.05),
+    },
+  )
+
+  # Phase 3 Sim-to-Real Domain Randomization:
+  # 6. Action latency. One whole-body lag per episode, 0-8 physics steps (0-40 ms at
+  #    dt=0.005). The Exp 5 sim2sim sweep showed standing oscillation from ~20-30 ms
+  #    and falls at 40 ms for the Phase 2 policy trained without delay.
+  cfg.events["action_delay"] = EventTermCfg(
+    mode="reset",
+    func=dr.sync_actuator_delays,
+    params={
+      "asset_cfg": SceneEntityCfg("robot"),
+      "lag_range": (0, G1_23DOF_MAX_ACTION_LAG),
     },
   )
 
