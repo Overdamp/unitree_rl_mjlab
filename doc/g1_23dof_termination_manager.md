@@ -131,7 +131,7 @@ return tilt > limit_angle
 | # | เงื่อนไข | ไปที่ | ค่า | ตั้งที่ | สถานะไฟล์ |
 |---|---|---|---|---|---|
 | 1 | **เอียงเกิน** `torso_tilt_exceeds` | Passive | `|acos(−g_z)| > 0.85 rad` (≈ 48.7°) จาก IMU ใน pelvis | `deploy/robots/g1_23dof/src/State_RLBase.cpp` | 🟢 |
-| 2 | **LowState ขาดหาย** `lowstate->isTimeout()` | Passive | ไม่ได้รับ LowState นานเกิน **1000 ms** (ค่า default ของ SDK `timeout_ms_{1000}`) | `deploy/include/FSM/FSMState.h` (ทุก state) | 🔴 |
+| 2 | **LowState ขาดหาย** `lowstate->isTimeout()` | Passive | ไม่ได้รับ LowState นานเกิน **100 ms** (SDK default คือ 1000 ms; 23 DoF ตั้ง `set_timeout_ms(100)` หลัง connect) | check: `deploy/include/FSM/FSMState.h` (ทุก state) 🔴 / ค่า: `deploy/robots/g1_23dof/main.cpp` | 🟢 |
 | 3 | จอย `LT + B` | Passive | กดพร้อมกัน | `config.yaml` → `Velocity.transitions` | 🟢 |
 | 4 | คีย์บอร์ด `p` | Passive | เฉพาะเมื่อเปิด keyboard shortcuts (sim) | `FSMState.h` | 🔴 |
 
@@ -171,7 +171,7 @@ return tilt > limit_angle
 - ไม่เช็ค NaN/Inf ของ obs หรือ action ก่อนส่ง (ตอนเทรนมี `nan_to_num` ใน reward แต่ไม่มี termination)
 - ไม่เช็ค joint position/velocity เกิน, อุณหภูมิมอเตอร์ หรือแรงดันแบตเตอรี่
 - ไม่เช็คความสูงของลำตัว
-- `isTimeout` 1000 ms ถือว่านาน: ถ้า DDS หลุด มอเตอร์จะค้างที่ target สุดท้ายประมาณ 1 วินาที ควรพิจารณาลดค่า (เช่น `lowstate->set_timeout_ms(100)`) ในไฟล์ 🟢 ของ 23 DoF
+- ~~`isTimeout` 1000 ms ถือว่านาน~~ แก้แล้ว (27/10/2026): `main.cpp` ของ 23 DoF ตั้ง `lowstate->set_timeout_ms(100)` หลัง `wait_for_connection()` ถ้า DDS หลุด มอเตอร์จะค้างที่ target สุดท้ายไม่เกินประมาณ 0.1 วินาทีก่อนเข้า Passive
 
 ---
 

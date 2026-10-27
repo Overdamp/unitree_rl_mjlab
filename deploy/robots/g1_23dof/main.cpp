@@ -23,6 +23,11 @@ void init_fsm_state()
     spdlog::info("Waiting for connection to robot...");
     FSMState::lowstate->wait_for_connection();
     spdlog::info("Connected to robot.");
+    // The SDK default (1000 ms) holds the last motor targets for a full second
+    // after DDS drops. LowState arrives at ~500 Hz, so 100 ms is ~50 lost messages.
+    // Set after connecting so the startup wait loop is unchanged.
+    FSMState::lowstate->set_timeout_ms(100);
+    spdlog::info("LowState timeout set to 100 ms.");
 }
 
 int main(int argc, char** argv)
