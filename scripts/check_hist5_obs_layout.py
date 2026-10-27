@@ -6,7 +6,8 @@ in deploy.yaml order; on reset it fills every frame with the first observation.
 This script verifies mjlab produces the same layout, so deploy.yaml only needs
 history_length: 5 per term.
 
-Usage: python scripts/check_hist5_obs_layout.py
+Usage: PYTHONPATH=$PWD python scripts/check_hist5_obs_layout.py
+(PYTHONPATH makes a git worktree use its own `src`, not the editable install.)
 """
 
 import torch

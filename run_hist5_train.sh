@@ -7,6 +7,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+# The conda env has this repo pip-installed in editable mode, which maps `src` to the
+# original checkout. Put this checkout first so a git worktree runs its own code.
+export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
+
 python scripts/train.py Unitree-G1-23Dof-Rough-Blind-Hist5 \
   --env.scene.num-envs=1024 \
   --agent.max-iterations=15000 \
