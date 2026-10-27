@@ -44,3 +44,10 @@ def unitree_g1_23dof_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
     num_steps_per_env=24,
     max_iterations=10001,
   )
+
+
+def unitree_g1_23dof_hist5_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+  """Same PPO settings, separate log folder for the from-scratch history-5 line."""
+  cfg = unitree_g1_23dof_ppo_runner_cfg()
+  cfg.experiment_name = "g1_23dof_velocity_hist5"
+  return cfg

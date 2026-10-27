@@ -344,3 +344,23 @@ def unitree_g1_23dof_rough_blind_env_cfg(play: bool = False) -> ManagerBasedRlEn
   twist_cmd.ranges.lin_vel_y = (-0.5, 0.5)
 
   return cfg
+
+
+# Actor observation history in policy steps (5 x 20 ms = 100 ms, > the 20 ms max
+# action lag). Lets a blind policy infer latency, base velocity and terrain.
+G1_23DOF_ACTOR_HISTORY = 5
+
+
+def unitree_g1_23dof_rough_blind_hist5_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Rough-Blind with a 5-frame actor history (actor 80 -> 400), trained from scratch.
+
+  mjlab flattens history per term, oldest to newest, then concatenates terms. This is
+  the deploy ObservationManager layout with use_gym_history=false, so deploy.yaml
+  only needs history_length: 5 on every actor term. The critic keeps a single frame.
+  """
+  cfg = unitree_g1_23dof_rough_blind_env_cfg(play=play)
+  cfg.observations["actor"].history_length = G1_23DOF_ACTOR_HISTORY
+  cfg.observations["actor"].flatten_history_dim = True
+  return cfg
