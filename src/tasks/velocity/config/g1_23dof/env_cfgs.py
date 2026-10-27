@@ -1,5 +1,6 @@
 """Unitree G1-23DOF velocity environment configurations."""
 
+import copy
 from dataclasses import replace
 
 from mjlab.actuator import DelayedActuatorCfg
@@ -294,5 +295,52 @@ def unitree_g1_23dof_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     twist_cmd.ranges.lin_vel_x = (-0.5, 1.0)
     twist_cmd.ranges.lin_vel_y = (-0.5, 0.5)
     twist_cmd.ranges.ang_vel_z = (-0.5, 0.5)
+
+  return cfg
+
+
+def unitree_g1_23dof_rough_blind_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
+  """Phase 4: blind rough terrain with stronger velocity tracking.
+
+  Observations match the Flat task exactly (actor 80, critic 95), so the Phase 3b
+  Flat checkpoint resumes as-is and the exported policy still runs in deploy,
+  which has no height map.
+  """
+  cfg = unitree_g1_23dof_rough_env_cfg(play=play)
+
+  cfg.scene.sensors = tuple(
+    s for s in (cfg.scene.sensors or ()) if s.name != "terrain_scan"
+  )
+  del cfg.observations["actor"].terms["height_scan"]
+  del cfg.observations["critic"].terms["height_scan"]
+
+  # ROUGH_TERRAINS_CFG targets robots with a height scan (slopes up to 45 deg).
+  # Scale it down for blind walking. Deep-copy so the shared preset is untouched.
+  assert cfg.scene.terrain is not None
+  terrain_gen = cfg.scene.terrain.terrain_generator
+  assert terrain_gen is not None
+  sub_terrains = copy.deepcopy(terrain_gen.sub_terrains)
+  sub_terrains["pyramid_stairs"].step_height_range = (0.0, 0.08)
+  sub_terrains["pyramid_stairs_inv"].step_height_range = (0.0, 0.08)
+  sub_terrains["hf_pyramid_slope"].slope_range = (0.0, 0.4)  # up to ~22 deg
+  sub_terrains["hf_pyramid_slope_inv"].slope_range = (0.0, 0.4)
+  sub_terrains["random_rough"].noise_range = (0.02, 0.06)
+  sub_terrains["wave_terrain"].amplitude_range = (0.0, 0.1)
+  cfg.scene.terrain.terrain_generator = replace(terrain_gen, sub_terrains=sub_terrains)
+  # Start the flat-trained policy on the easiest rows; terrain_levels promotes it.
+  cfg.scene.terrain.max_init_terrain_level = 1
+
+  # Phase 3b tracked 0.4 m/s but reached only 0.41 m/s when commanded 1.0 m/s.
+  # Double the tracking reward and train only the range deploy can command
+  # (deploy.yaml clamps vx to [-0.5, 1.0]) instead of the -1..2 m/s stage.
+  cfg.rewards["track_linear_velocity"].weight = 2.0
+  if "command_vel" in cfg.curriculum:
+    cfg.curriculum["command_vel"].params["velocity_stages"] = [
+      {"step": 0, "lin_vel_x": (-0.5, 1.2), "lin_vel_y": (-0.5, 0.5), "ang_vel_z": (-1.0, 1.0)},
+    ]
+  twist_cmd = cfg.commands["twist"]
+  assert isinstance(twist_cmd, UniformVelocityCommandCfg)
+  twist_cmd.ranges.lin_vel_x = (-0.5, 1.2)
+  twist_cmd.ranges.lin_vel_y = (-0.5, 0.5)
 
   return cfg
