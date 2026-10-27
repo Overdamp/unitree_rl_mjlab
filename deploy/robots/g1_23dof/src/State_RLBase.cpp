@@ -1,3 +1,6 @@
+#include <algorithm>
+#include <cmath>
+
 #include "FSM/State_RLBase.h"
 #include "unitree_articulation.h"
 #include "isaaclab/envs/mdp/observations/observations.h"
@@ -52,6 +55,18 @@ REGISTER_OBSERVATION(keyboard_gait_phase)
 
 }
 
+namespace
+{
+// The shared isaaclab::mdp::bad_orientation is disabled upstream (always false)
+// for every robot, so G1-23DoF keeps its own active tilt check here.
+bool torso_tilt_exceeds(isaaclab::ManagerBasedRLEnv* env, float limit_angle)
+{
+    const auto& gravity = env->robot->data.projected_gravity_b;
+    const float cos_tilt = std::clamp(-gravity[2], -1.0f, 1.0f);
+    return std::fabs(std::acos(cos_tilt)) > limit_angle;
+}
+}
+
 State_RLBase::State_RLBase(int state_mode, std::string state_string)
 : FSMState(state_mode, state_string) 
 {
@@ -77,7 +92,7 @@ State_RLBase::State_RLBase(int state_mode, std::string state_string)
     this->registered_checks.emplace_back(
         std::make_pair(
             [&]()->bool{
-                const bool bad = isaaclab::mdp::bad_orientation(env.get(), 0.85f);
+                const bool bad = torso_tilt_exceeds(env.get(), 0.85f);
                 if (bad) {
                     spdlog::warn("Safety trigger: bad_orientation (> 0.85 rad) detected! Switching to Passive.");
                 }
