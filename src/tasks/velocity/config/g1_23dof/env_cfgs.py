@@ -174,9 +174,9 @@ def unitree_g1_23dof_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   )
 
   # Phase 3 Sim-to-Real Domain Randomization:
-  # 6. Action latency. One whole-body lag per episode, 0-8 physics steps (0-40 ms at
-  #    dt=0.005). The Exp 5 sim2sim sweep showed standing oscillation from ~20-30 ms
-  #    and falls at 40 ms for the Phase 2 policy trained without delay.
+  # 6. Action latency. One whole-body lag per episode, 0-G1_23DOF_MAX_ACTION_LAG physics
+  #    steps (0-20 ms at dt=0.005). The Exp 5 sim2sim sweep showed standing oscillation
+  #    from ~20-30 ms and falls at 40 ms for the Phase 2 policy trained without delay.
   cfg.events["action_delay"] = EventTermCfg(
     mode="reset",
     func=dr.sync_actuator_delays,
