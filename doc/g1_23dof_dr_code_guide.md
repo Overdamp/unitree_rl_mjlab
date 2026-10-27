@@ -6,7 +6,7 @@
 3. รายละเอียดเชิงลึกของ DR แต่ละตัว
 
 ตรวจกับโค้ดที่ commit `f96f209` (branch `phase3-delay-dr`) และ mjlab 1.2.0 ที่ติดตั้งไว้ที่
-`~/.local/lib/python3.10/site-packages/mjlab/` (27/10/2026) เลขบรรทัดอาจเลื่อนเมื่อแก้โค้ด
+`~/miniconda3/envs/unitree_rl_mjlab/lib/python3.11/site-packages/mjlab/` (27/10/2026) เลขบรรทัดอาจเลื่อนเมื่อแก้โค้ด
 
 เอกสารที่เกี่ยวข้อง:
 - `doc/domain_randomization_phases_g1_23dof.md`: DR แยกตาม phase และผลของแต่ละ phase
@@ -93,7 +93,7 @@ scripts/train.py Unitree-G1-23Dof-Flat
 ```
 
 ฟังก์ชัน DR (`dr.body_mass`, `dr.pd_gains` ฯลฯ) อยู่ใน mjlab ไม่ได้อยู่ใน repo นี้:
-`~/.local/lib/python3.10/site-packages/mjlab/envs/mdp/dr/` (`body.py`, `joint.py`, `geom.py`, `actuator.py`)
+`~/miniconda3/envs/unitree_rl_mjlab/lib/python3.11/site-packages/mjlab/envs/mdp/dr/` (`body.py`, `joint.py`, `geom.py`, `actuator.py`)
 และ `mjlab/envs/mdp/events.py` (`push_by_setting_velocity`, `reset_*`)
 
 ### ไฟล์ไหนแก้ได้ ไฟล์ไหนไม่ควรแก้
@@ -110,7 +110,7 @@ scripts/train.py Unitree-G1-23Dof-Flat
 | `scripts/train.py`, `scripts/play.py` | ทุก task | |
 | `deploy/include/` (FSM, observation/action manager, `param.h`) | `g1_ctrl` ของทุกรุ่น (CMakeLists 6 รุ่น) | ต้อง build ใหม่ทุกรุ่น และพฤติกรรม FSM เปลี่ยนทุกรุ่น |
 | `simulate/src/` | `unitree_mujoco` ของทุกรุ่น | |
-| mjlab ใน `~/.local/lib/python3.10/site-packages/mjlab/` | ทุก task และทุกโปรเจกต์ที่ใช้ mjlab | หายเมื่อ `pip install` ใหม่ และไม่ถูกเก็บใน git |
+| mjlab ใน `~/miniconda3/envs/unitree_rl_mjlab/lib/python3.11/site-packages/mjlab/` | ทุก task และทุกโปรเจกต์ที่ใช้ mjlab | หายเมื่อ `pip install` ใหม่ และไม่ถูกเก็บใน git |
 
 #### 🟡 ใช้ร่วมกันเฉพาะ G1-23DoF: แก้ได้ แต่ต้องรู้ผลกระทบ
 
