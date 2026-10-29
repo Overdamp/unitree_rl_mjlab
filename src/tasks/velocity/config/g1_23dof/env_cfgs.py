@@ -364,3 +364,24 @@ def unitree_g1_23dof_rough_blind_hist5_env_cfg(
   cfg.observations["actor"].history_length = G1_23DOF_ACTOR_HISTORY
   cfg.observations["actor"].flatten_history_dim = True
   return cfg
+
+
+def unitree_g1_23dof_rough_blind_hist5_yaw_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Hist5 yaw fine-tune: resume Rough-Blind-Hist5 (model_14999) for turning.
+
+  The sim2sim check reached only 30-40% of a commanded wz (P3b ~70%), while vx up
+  to 1.0 m/s tracked well. Two likely causes: Rough-Blind doubled the linear
+  tracking weight but kept angular at 1.0, and with rel_heading_envs=1.0 every
+  moving env gets wz from the heading controller (0.5 x heading error, decaying
+  to zero), unlike the constant wz a joystick sends in deploy. Observations are
+  unchanged, so the policy and deploy.yaml stay compatible.
+  """
+  cfg = unitree_g1_23dof_rough_blind_hist5_env_cfg(play=play)
+  cfg.rewards["track_angular_velocity"].weight = 2.0
+  twist_cmd = cfg.commands["twist"]
+  assert isinstance(twist_cmd, UniformVelocityCommandCfg)
+  # About 70% of moving envs now sample a constant wz in [-1, 1] like the joystick.
+  twist_cmd.rel_heading_envs = 0.3
+  return cfg
