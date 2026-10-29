@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 
 #include "FSM/State_RLBase.h"
@@ -105,8 +106,33 @@ State_RLBase::State_RLBase(int state_mode, std::string state_string)
 
 void State_RLBase::run()
 {
+    // Soft start: for kEntryRampS after entering Velocity, blend the policy targets
+    // from the pose the previous state was holding (FixStand qs). Without it the
+    // first policy step can jump a joint by up to 1 rad (Hist5 yaw_ft: left
+    // shoulder roll on its first step in sim), and until the policy thread resets
+    // the action manager the previous episode's targets would be sent.
+    // run() is called every FSM tick (1 ms) only while this state is active, so a
+    // gap since the last call means the state was just entered.
+    using clock = std::chrono::steady_clock;
+    constexpr double kEntryRampS = 0.5;
+    static clock::time_point last_run;
+    static clock::time_point entered;
+    static std::vector<float> q_start;
+    const auto& ids = env->robot->data.joint_ids_map;
+    const auto now = clock::now();
+    if (q_start.size() != ids.size() || now - last_run > std::chrono::milliseconds(50)) {
+        entered = now;
+        q_start.resize(ids.size());
+        for (size_t i = 0; i < ids.size(); ++i) {
+            q_start[i] = lowcmd->msg_.motor_cmd()[ids[i]].q();
+        }
+    }
+    last_run = now;
+    const float alpha = static_cast<float>(
+        std::min(1.0, std::chrono::duration<double>(now - entered).count() / kEntryRampS));
+
     auto action = env->action_manager->processed_actions();
-    for(int i(0); i < env->robot->data.joint_ids_map.size(); i++) {
-        lowcmd->msg_.motor_cmd()[env->robot->data.joint_ids_map[i]].q() = action[i];
+    for(size_t i = 0; i < ids.size(); i++) {
+        lowcmd->msg_.motor_cmd()[ids[i]].q() = q_start[i] + alpha * (action[i] - q_start[i]);
     }
 }

@@ -1,6 +1,6 @@
 # G1-23DoF: เช็คลิสต์เชื่อมต่อและตรวจ joint กับหุ่นจริง
 
-บันทึกเมื่อ 28/10/2026 · branch `phase3-delay-dr` · ยังไม่ deploy policy
+บันทึกเมื่อ 28/10/2026 · branch `phase3-delay-dr` · หัวข้อ 1–8 รอบ setup (ไม่ deploy), หัวข้อ 9 deploy รอบแรก (เพิ่ม 29/10/2026)
 
 ## ขอบเขต
 
@@ -208,13 +208,129 @@ python deploy/robots/g1_23dof/scripts/pd_check.py ~/g1_state_X.csv ~/g1_cmd_X.cs
 
 > รัน `unitree_mujoco` / `g1_ctrl` จาก shell ที่ source ROS แล้วจะ crash ที่ `dds_write.c ... iox_pub` เพราะโหลด `libddsc` ของ ROS ให้รันด้วย `env -u CYCLONEDDS_URI LD_LIBRARY_PATH=/opt/unitree_robotics/lib ./unitree_mujoco`
 
-## 8. ห้ามทำรอบนี้
+## 8. ห้ามทำรอบ setup (หัวข้อ 1–7)
 
 - ห้ามเข้า state Velocity / ห้ามรัน ONNX ทุกตัว
 - ห้ามวางหุ่นลงพื้นตอนมีแรงบิด
 - ถ้าเริ่มด้วย kp ต่ำ ห้ามเพิ่มเป็นค่าเต็มก่อนผ่านข้อค้าง FixStand 30 s ในหัวข้อ 6 (ถ้าใช้ค่าเดิมของ Unitree ตั้งแต่แรก ต้องแขวนหุ่นและพร้อมกด LT + B)
 - ห้ามแก้ config หน้างานแล้วรันต่อทันที ยกเว้นการลด kp
 - ห้ามรันงานหนัก (ติดตั้ง Isaac Sim, เทรน, docker อื่น) บน luke-mini ระหว่างต่อหุ่น
+
+## 9. Deploy รอบแรก: P3b บน gantry แล้วค่อยลงพื้น
+
+ทำเมื่อหัวข้อ 1–7 ผ่านแล้ว (ผ่านเมื่อ 28/10/2026) ใช้ policy P3b ที่อยู่ใน `config/policy/velocity/v0/exported/policy.onnx` (md5 `727da8a2…` เท่ากับ `policy_phase3b_16000.onnx`) เพราะเป็นตัวเดียวที่ผ่าน sim2sim กับ `g1_ctrl` + `unitree_mujoco` และแม่นที่สุดที่ vx ≤ 0.4 (97%) ห้ามเพิ่มโฟลเดอร์ใหม่ใน `config/policy/velocity/` ระหว่างรอบนี้ เพราะ `g1_ctrl` เลือกโฟลเดอร์ย่อยตัวสุดท้ายตามลำดับชื่อ
+
+ทำทีละขั้น ขั้นถัดไปเริ่มได้เมื่อขั้นก่อนผ่านทุกข้อ ถ้าไม่ผ่านให้หยุด กลับ Passive และบันทึกอาการ
+
+แขวนหุ่นไว้เพื่อตรวจ kp/kd ใน Passive และ FixStand เท่านั้น (9.1) **ไม่เข้า Velocity ตอนแขวน**: policy ยังทำงานแม้ไม่ดัน stick ขาจะขยับกลางอากาศโดยไม่ได้ข้อมูลเพิ่ม และ policy สาย Hist5 (Hist5, yaw_ft, yaw_stand) เตะขาแรงมากเมื่อเท้าไม่แตะพื้น (`vel_eval.py --hang`: yaw_stand ความเร็ว joint 131% ของ limit, แรงบิดชน 100%, ข้อเท้าเกิน limit) gain ของโหมด Velocity เป็นตัวเลขจากไฟล์ ตรวจใน sim (9.0) และดูอีกครั้งตอนเข้า Velocity บนพื้น (9.2)
+
+### 9.0 ก่อนเริ่มทุกครั้ง
+
+- [ ] หัวข้อ 1 (ความปลอดภัย, ฮาร์ดแวร์, PC) และหัวข้อ 2 (IP, ping, debug mode L2+R2) ผ่าน
+- [ ] ปิด `bringup_23dof.launch.py` / `loco_client` ของ g1pilot, ปิด viewer และ RViz (เหลือแค่ monitor 2 ตัว)
+- [ ] `md5sum deploy/robots/g1_23dof/config/policy/velocity/v0/exported/policy.onnx` = `727da8a2bc5293f617a8e06f8c13a07e`
+- [ ] `python deploy/robots/g1_23dof/scripts/gain_check.py deploy/robots/g1_23dof/config/policy/velocity/v0` ขึ้น `PASS` (joint map, kp, kd, default pose, action scale, offset และขนาด obs ตรงกับตอนเทรน)
+- [ ] คนถือรีโมทรู้ปุ่ม: **LT + ↑** = FixStand, **RT + A** = Velocity, **LT + B** = Passive (หยุดฉุกเฉิน ใช้ได้ทุกโหมด)
+- [ ] รู้ว่า stick ส่งความเร็วตรงๆ ไม่มีการ smooth: stick ซ้ายแกนตั้ง = vx (เต็ม stick = 1.0 m/s ถูก clamp ที่ [-0.5, 1.0]), stick ซ้ายแกนนอน = vy (±0.5), stick ขวาแกนนอน = wz (±1.0) — **รอบนี้ดันไม่เกิน ~40% ของ stick** (P3b ที่สั่ง 1.0 เดินได้แค่ 0.41 m/s)
+- [ ] เปิด 2 terminal บันทึกตลอดรอบ (env `g1_sdk`):
+  ```bash
+  cd ~/nvidia/unitree/unitree_rl_mjlab
+  T=$(date +%Y%m%d_%H%M)
+  python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --iface enp43s0 --log ~/g1_state_$T.csv
+  python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py   --iface enp43s0 --log ~/g1_cmd_$T.csv
+  ```
+- [ ] terminal ที่ 3 (ไม่ source ROS หรือใช้ `env -u CYCLONEDDS_URI LD_LIBRARY_PATH=/opt/unitree_robotics/lib`):
+  ```bash
+  cd ~/nvidia/unitree/unitree_rl_mjlab/deploy/robots/g1_23dof/build
+  ./g1_ctrl --network enp43s0
+  ```
+  ต้องเห็น `Connected to robot`, `LowState timeout set to 100 ms`, `ONNX policy loaded successfully: .../velocity/v0/exported/policy.onnx` และไม่ขึ้น `Unmatched robot type` หรือ `The other process is using the lowcmd channel`
+- [ ] ทำก่อนวันทดสอบ (sim): `g1_ctrl` build เดียวกันกับ `unitree_mujoco` (`--network lo`) + `lowcmd_monitor --iface lo` กด `u` แล้ว `v`: ต้องขึ้น `gains match: FixStand` แล้ว `Velocity`, slot 13, 14, 20, 21, 27, 28 ได้ kp = kd = 0, ไม่มี `MISMATCH`
+
+### 9.1 ขั้น 1: Passive แล้ว FixStand บน gantry (เท้าลอย)
+
+**Passive (kp = 0, ตรวจ kd)**
+
+- [ ] `lowcmd_monitor` = `gains match: Passive` (kp = 0 ทุก slot, kd 2.5–6)
+- [ ] ใช้มือหมุนข้อต่อช้าแล้วเร็ว: หนืดมากขึ้นตามความเร็ว แต่ไม่ดึงกลับที่เดิม ไม่มี joint กระตุก
+- [ ] `pd_check` ช่วง Passive: joint ที่หมุนเร็วพอได้ `kd x` 0.5–1.5 (joint ที่ไม่ได้หมุนขึ้น `not scored` เป็นเรื่องปกติ)
+
+**FixStand (gain ของ Unitree, ตรวจ kp)**
+
+- [ ] LT + ↑ → FixStand: ทุก joint เข้าท่ายืนใน ~3 s ไม่มีตัวไหนไปผิดทิศ, `lowcmd_monitor` = `FixStand` ไม่มี `MISMATCH`
+- [ ] ค้าง 30 s: q ห่าง `qs` < 0.05 rad (ห่าง ≈ แรงโน้มถ่วง / kp ถ้าห่างกว่าที่คาดมาก kp จริงอ่อนกว่าที่ส่ง), ไม่สั่น (ดูแขนเป็นพิเศษ: kd 10 ทำให้แขนสั่นใน `unitree_mujoco`), อุณหภูมิไม่ขึ้นเกิน ~5 °C
+- [ ] ดันข้อต่อแขน/ขาเบาๆ แล้วปล่อย: กลับเข้าที่นุ่มๆ (แกว่งหลายรอบ = kd น้อย, สั่นถี่ = kd มากหรือมี delay)
+- [ ] LT + B → Passive: คลายแรงแบบหนืด
+- [ ] หลังจบ: `python deploy/robots/g1_23dof/scripts/pd_check.py ~/g1_state_$T.csv ~/g1_cmd_$T.csv` ช่วง FixStand `kp x` 0.8–1.2, corr ≥ 0.9 ทุก joint ที่ถูก score; จด delay ที่ fit ได้
+
+**อ่านผล `pd_check` ที่ไม่ผ่าน**
+
+| อาการ | สาเหตุที่น่าจะเป็น | ทำอย่างไร |
+|---|---|---|
+| `MISMATCH` ใน `lowcmd_monitor` | config / `deploy.yaml` ผิด หรือ slot map ผิด | หยุด แก้ไฟล์ รัน `gain_check.py` ใหม่ |
+| `kp x` นอก 0.8–1.2 ทุก joint ไปทางเดียวกัน | `tau_est` (ประมาณจากกระแส, คลาดได้ ~±10–20%) หรือแบตอ่อน | ดูแรงดันแบต เทียบกับการดันด้วยมือ |
+| `kp x` ผิดเฉพาะบาง joint | มอเตอร์ตัวนั้นมีปัญหาหรือ friction สูง | ดูอุณหภูมิและ `motorstate` error ของตัวนั้น |
+| `SIGN` | ทิศคำสั่งกลับกัน (ไม่ควรเกิดเพราะหัวข้อ 4 ตรวจแล้ว) | หยุดทันที |
+| delay ที่ fit ได้ > 10 ms | network หรือ PC หน่วง | ดู gap ใน `lowstate_monitor` ปิดงานหนักบน PC |
+| ข้อเท้า `kp x` แปลก | linkage ข้อเท้า firmware แปลงแรงบิดให้ | จดไว้ ถ้ายืนใน 9.2 ปกติถือว่าผ่าน |
+
+### 9.2 ขั้น 2: ยืนบนพื้น (Velocity, stick = 0)
+
+- [ ] เริ่มจาก FixStand บน gantry แล้วหย่อนลงจนเท้าแตะพื้นเต็มเท้า เชือกยังรับไว้แต่หย่อนพอให้หุ่นรับน้ำหนักเอง
+- [ ] RT + A → Velocity (soft start: เป้าหมายค่อยๆ เปลี่ยนจากท่า FixStand ใน 0.5 s): ยืนนิ่ง ไม่โยกหรือย่ำเท้าแรง, IMU เอียง < 5° ใน `lowstate_monitor`
+- [ ] `lowcmd_monitor` = `gains match: Velocity` (kp 40.2/99.1/28.5/14.3 ตาม slot), slot 13, 14, 20, 21, 27, 28 ได้ kp = kd = 0, ไม่มี `MISMATCH`
+- [ ] ยืน 30 s แล้ว LT + B โดยให้เชือกรับน้ำหนักก่อนกด (Passive ไม่มี kp หุ่นจะทรุด)
+
+### 9.3 ขั้น 3: เดินช้า (เชือกยังกันไว้)
+
+- [ ] ดัน stick ซ้ายไปข้างหน้าเบาๆ ~20% (≈ 0.2 m/s) 3–5 s แล้วปล่อย ให้หุ่นหยุดเอง
+- [ ] ถ้าผ่าน เพิ่มเป็น ~40% (≈ 0.4 m/s) ระยะสั้น
+- [ ] คาดไว้ก่อนว่า P3b เลี้ยวขวาเองประมาณ 2°/s (วัดใน sim) แก้ด้วย stick ขวา
+- [ ] ถอยหลังเบาๆ ~20%
+
+### 9.4 ขั้น 4: หมุนและเดินด้านข้าง
+
+- [ ] หมุนอยู่กับที่ด้วย stick ขวา ~30% ทั้งสองทิศ (P3b หมุนได้ ~70% ของคำสั่งใน sim)
+- [ ] เดินด้านข้างเบาๆ ~30% (P3b ได้ ~60% ของคำสั่ง)
+
+### 9.5 หยุดทันที (LT + B) เมื่อ
+
+- joint ใดไปผิดทิศ, สั่นถี่ หรือมีเสียงผิดปกติจากเกียร์
+- `lowcmd_monitor` ขึ้น `MISMATCH` หรือ `unknown`, `lowstate_monitor` ขึ้น `STALE`, gap > 100 ms หรือ joint ขึ้น `OUT`
+- อุณหภูมิมอเตอร์ตัวใด > 70 °C หรือขึ้นเร็วผิดปกติ
+- ลำตัวเอียงเกิน ~15° (ระบบตัดเองที่ 0.85 rad ≈ 49° ซึ่งช้าเกินไปสำหรับการป้องกันการล้ม)
+- คนใดคนหนึ่งพูด "หยุด"
+
+### 9.6 ความปลอดภัยของ policy และการหยุด (ตรวจใน sim และโค้ด 29/10/2026)
+
+วัดด้วย `vel_eval.py` (safety stats) บนพื้นเรียบ 7 กรณี (ยืน, vx 0.4/1.0/−0.5, wz 1.0, vy 0.5, ผสม) ทั้งแบบคำสั่ง smooth และแบบกระโดดทันทีเหมือน stick จริง (`--no-smooth`)
+
+| รายการ | P3b (v0) | yaw_ft | ความหมาย |
+|---|---|---|---|
+| ล้ม / เอียงสูงสุด | ไม่ล้ม / ≤ 4.4° | ไม่ล้ม / ≤ 5.7° | stick กระโดดทันทีก็ไม่ล้มทั้งคู่ |
+| ความเร็ว joint สูงสุด / limit มอเตอร์ | ≤ 29% (เข่า) | ≤ 45% (เข่า) | ไม่เหวี่ยงใกล้ limit ความเร็ว |
+| แรงบิดสูงสุด / effort limit | ≤ 66% (ข้อเท้า) | ≤ 66% | ไม่ชนเพดานแรงบิด |
+| q จริงห่าง limit ข้อต่ออย่างน้อย | 0.17 rad (ankle roll) | 0.12 rad (ankle roll) | ข้อต่อจริงไม่ชน hard stop |
+| เป้าหมายเกิน limit ข้อต่อ | ≤ 0.5% ของ step, สูงสุด 0.3 rad (ankle pitch) | ≤ 1.1%, สูงสุด 0.29 rad | `clip: null` ไม่มีการจำกัด แต่ข้อต่อจริงไม่ไปถึง |
+| กระตุกตอนเข้า Velocity (step แรก, max \|target − default\|) | 0.28 rad (shoulder roll) | **1.00 rad (left shoulder roll)**, −0.54 (right shoulder roll), −0.41 (right knee) | เกิด step เดียว 20 ms แล้วกลับปกติ ข้อต่อจริงขยับ < 0.1 rad แต่ควรดูแขนตอนกด RT + A |
+
+**กลไกหยุดใน `g1_ctrl` (จากโค้ด)**
+
+| กลไก | ทำงานเมื่อ | เร็วแค่ไหน | ข้อจำกัด |
+|---|---|---|---|
+| LT + B → Passive | ทุกโหมด | FSM ตรวจทุก 1 ms + รอ policy thread หยุด ≤ 20 ms | Passive คือ kp = 0: บน gantry หุ่นห้อยหนืด, บนพื้นหุ่นทรุดลงแบบหน่วง |
+| LowState timeout → Passive | ไม่ได้ `rt/lowstate` 100 ms | 100 ms | ถ้าสาย/เครือข่ายขาด คำสั่ง Passive ก็ไปไม่ถึงมอเตอร์ อาการขึ้นกับ firmware (ทดสอบด้วยการดึงสาย LAN ใน 9.1 ตอนแขวน) |
+| bad_orientation → Passive | เฉพาะ Velocity, เอียง > 0.85 rad (49°) | ทันที | ช้าเกินกันล้ม ใช้คนกด LT + B ที่ ~15° |
+| ไม่มี | จำกัดตำแหน่งเป้าหมาย (`clip: null`), จำกัดความเร็ว joint, ramp ตอนเข้า Velocity | – | พึ่ง limit ในมอเตอร์ firmware |
+
+- [ ] ทดสอบตอนแขวนใน FixStand: ปิด `g1_ctrl` (Ctrl-C) แล้วจดว่ามอเตอร์ค้างท่า, หนืด หรือปล่อยตัว (ยังไม่เคยวัด)
+
+### 9.7 บันทึก
+
+- [ ] CSV จาก monitor ทั้งสองตัว ทุกขั้น (จดเวลาเริ่ม/จบของแต่ละขั้นไว้ใช้กับ `--t0/--t1`)
+- [ ] วิดีโอทุกขั้น
+- [ ] ผล `pd_check.py` ของขั้น 1 (และช่วง Velocity บนพื้นถ้าต้องการดู `kp x` / `kd x` ของ gain ชุด policy)
+- [ ] แบต/อุณหภูมิตอนเริ่มและตอนจบ, อาการผิดปกติทุกอย่าง
 
 ## ผลการตรวจ 28/10/2026 (หุ่นแขวนบน gantry, damping ของ Unitree, ไม่ส่ง `rt/lowcmd`)
 

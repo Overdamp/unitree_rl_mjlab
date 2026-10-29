@@ -61,7 +61,12 @@ FSM:
     transitions: 
       Passive: LT + B.on_pressed
 #      Mimic_Dance1_subject2: RB + A.on_pressed
-    policy_dir: config/policy/velocity
+    # Pinned: without an `exported` folder here, g1_ctrl takes the last subfolder by
+    # name, so adding a policy folder could silently replace the deployed one.
+    # v0 = P3b (phase3b_16000); hist5_yawft = Hist5 yaw fine-tune (model_17998);
+    # hist5_yawstand = yaw + stand fine-tune (model_19497). Hist5 policies flail when
+    # hung: enter Velocity only with the feet on the ground.
+    policy_dir: config/policy/velocity/v0
 
   Mimic_Dance1_subject2:
     transitions:
