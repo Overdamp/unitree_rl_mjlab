@@ -6,7 +6,7 @@ robot is not commanded. Use it to validate the connection and the joint map
 before running ``g1_ctrl`` (see doc/g1_23dof_real_robot_setup_checklist.md).
 
 It shows the message rate and gaps, mode_machine/mode_pr, IMU, and per joint
-q / dq / temperature, the min/max seen so far, and the MJCF limits. On exit
+q / dq / tau_est / temperature, the min/max seen so far, and the MJCF limits. On exit
 (Ctrl-C or --duration) it prints a summary and can save a CSV log.
 
 Run with the conda env that has unitree_sdk2py (``g1_sdk``):
@@ -115,7 +115,7 @@ class LowStateMonitor:
       header = ["t", "tick", "mode_machine", "mode_pr"]
       header += ["quat_w", "quat_x", "quat_y", "quat_z", "gyro_x", "gyro_y", "gyro_z"]
       header += [f"q{i}" for i in range(NUM_SLOTS)] + [f"dq{i}" for i in range(NUM_SLOTS)]
-      header += [f"temp{i}" for i in range(NUM_SLOTS)]
+      header += [f"temp{i}" for i in range(NUM_SLOTS)] + [f"tau{i}" for i in range(NUM_SLOTS)]
       self._log.writerow(header)
 
   def handler(self, msg: LowState_):
@@ -148,6 +148,7 @@ class LowStateMonitor:
         row += [msg.motor_state[i].q for i in range(NUM_SLOTS)]
         row += [msg.motor_state[i].dq for i in range(NUM_SLOTS)]
         row += [max(msg.motor_state[i].temperature) for i in range(NUM_SLOTS)]
+        row += [msg.motor_state[i].tau_est for i in range(NUM_SLOTS)]
         self._log.writerow(row)
 
   def snapshot(self):
@@ -209,7 +210,7 @@ def render(s: dict, limits: dict) -> str:
   )
   lines.append("")
   lines.append(
-    f"{'idx':>3} {'joint':<27} {'q':>8} {'dq':>8} {'temp':>5} {'min seen':>9} {'max seen':>9}"
+    f"{'idx':>3} {'joint':<27} {'q':>8} {'dq':>8} {'tau':>7} {'temp':>5} {'min seen':>9} {'max seen':>9}"
     f" {'MJCF lo':>8} {'MJCF hi':>8}  flag"
   )
   for idx, name in G1_23DOF_JOINTS.items():
@@ -225,7 +226,7 @@ def render(s: dict, limits: dict) -> str:
       flags.append(f"err=0x{m.motorstate:x}")
     lo, hi = lim if lim else (float("nan"), float("nan"))
     lines.append(
-      f"{idx:>3} {name:<27} {m.q:8.3f} {m.dq:8.3f} {max(m.temperature):5d}"
+      f"{idx:>3} {name:<27} {m.q:8.3f} {m.dq:8.3f} {m.tau_est:7.2f} {max(m.temperature):5d}"
       f" {s['q_min'][idx]:9.3f} {s['q_max'][idx]:9.3f} {lo:8.3f} {hi:8.3f}  {' '.join(flags)}"
     )
   lines.append("")

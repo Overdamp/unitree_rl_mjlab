@@ -131,13 +131,16 @@
 
 ขั้นนี้ใช้ `g1_ctrl` แต่ไปแค่ Passive → FixStand ห้ามกดเข้า Velocity (RT + A) คนถือรีโมทพร้อมกด LT + B (กลับ Passive) ตลอด ปิด `bringup_23dof.launch.py` ของ g1pilot ก่อน (`loco_client` กับ `g1_ctrl` ห้ามรันพร้อมกัน)
 
-- [ ] สำเนา `config.yaml` แล้วลด FixStand kp เหลือ ~30% และยืด `ts` เป็น `[0, 6]` (ไปท่ายืนช้าลง)
+- [ ] (ไม่บังคับ) สำเนา `config.yaml` แล้วลด FixStand kp เหลือ ~30% และยืด `ts` เป็น `[0, 6]` ค่าเดิมเป็นของ Unitree ใช้ได้เลยเพราะหัวข้อ 4 ตรวจ index/ทิศแล้ว
+- [ ] เปิด `lowstate_monitor.py --log` และ `lowcmd_monitor.py --log` พร้อมกันก่อนรัน `g1_ctrl` (หัวข้อ 7.4) เพื่อใช้ `pd_check.py` ทีหลัง
 - [ ] รัน `g1_ctrl --network enp43s0` ต้องเห็น "Connected to robot" และไม่ขึ้น "Unmatched robot type"
 - [ ] อยู่ใน Passive: หุ่นหนืดตาม kd ไม่มี joint ไหนกระตุก
 - [ ] กด LT + up → FixStand: ทุก joint เคลื่อนเข้าท่ายืนนุ่มๆ ไม่มีตัวไหนไปผิดทิศ (ถ้ามี → LT + B ทันที)
 - [ ] ค้าง FixStand 30 s: ความคลาดเคลื่อนจาก `qs` < 0.05 rad ทุก joint ไม่สั่น อุณหภูมิมอเตอร์ไม่พุ่ง
 - [ ] ดึงสาย LAN ออกขณะ FixStand (ทดสอบ timeout 100 ms): หุ่นต้องไม่ค้างคำสั่งเก่า จดอาการที่เกิดขึ้น — ทำตอน kp ต่ำเท่านั้น
 - [ ] กด LT + B → Passive หุ่นคลายแรงแบบหนืด ไม่ตกกระแทก
+- [ ] `lowcmd_monitor.py` ขึ้น `gains match: Passive` / `FixStand` ตรงกับโหมด ไม่มี `MISMATCH`
+- [ ] `pd_check.py` ของช่วง FixStand: `kp x` 0.8–1.2 และ corr ≥ 0.9 ทุก joint ที่ถูก score (หัวข้อ 7.5)
 
 ## 7. เครื่องมือ
 
@@ -153,7 +156,7 @@ python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --iface enp43s0 --log 
 
 - `--iface lo` ใช้กับ `unitree_mujoco` (ต้องเปิด multicast บน `lo` ก่อน)
 - `--duration 60` หยุดเองหลัง 60 s (ใช้กับข้อ "LowState ต่อเนื่อง 1 นาที")
-- `--log` เก็บทุกข้อความเป็น CSV (q, dq, อุณหภูมิ 29 ช่อง, quaternion, gyro) ไว้เทียบกับ sim ภายหลัง
+- `--log` เก็บทุกข้อความเป็น CSV (q, dq, tau_est, อุณหภูมิ 29 ช่อง, quaternion, gyro) ไว้เทียบกับ sim ภายหลัง
 
 ### 7.2 Mirror ด้วย RViz (docker g1pilot)
 
@@ -178,11 +181,38 @@ ros2 launch g1pilot robot_state_23dof.launch.py use_rviz:=true
 - [ ] รูป/วิดีโอหุ่นจริงคู่กับจอ RViz ตอนอยู่ท่ายืน
 - [ ] ค่าที่ไม่ตรงทุกค่า + แบต/อุณหภูมิตอนเริ่มและตอนจบ
 
+### 7.4 `lowcmd_monitor.py` (read-only)
+
+subscribe `rt/lowcmd` ที่ `g1_ctrl` ส่งไปมอเตอร์ ไม่ publish (ไม่ชนกับการเช็ค "other process is using the lowcmd channel" ของ `g1_ctrl`) แสดง q_des / dq_des / kp / kd / tau_ff ทั้ง 29 slot บอกว่า gain ตรงกับโหมดไหน (Passive / FixStand / Velocity จาก `config.yaml` + `deploy.yaml`) และไฮไลต์ slot ที่ไม่ตรง รวมถึง slot 13, 14, 20, 21, 27, 28 ที่ต้องได้ kp = kd = 0 ใน Velocity
+
+```bash
+# terminal 1
+python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --iface enp43s0 --log ~/g1_state_$(date +%Y%m%d_%H%M).csv
+# terminal 2
+python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py --iface enp43s0 --log ~/g1_cmd_$(date +%Y%m%d_%H%M).csv
+```
+
+`--deploy` ระบุ `deploy.yaml` ที่ `g1_ctrl` โหลด (ค่าเริ่มต้น `config/policy/velocity/v0`)
+
+### 7.5 `pd_check.py` (วิเคราะห์ CSV จาก 7.1 + 7.4)
+
+```bash
+python deploy/robots/g1_23dof/scripts/pd_check.py ~/g1_state_X.csv ~/g1_cmd_X.csv
+python deploy/robots/g1_23dof/scripts/pd_check.py ~/g1_state_X.csv ~/g1_cmd_X.csv --replay --t0 5 --t1 25
+```
+
+1. **Torque check:** หา delay ของคำสั่งก่อน (0–30 ms) แล้ว fit `tau_est − tau_ff = a·kp(q_des−q) + b·kd(dq_des−dq)` ต่อ joint ต่อโหมด `kp x` (a) และ `kd x` (b) ใกล้ 1 แปลว่ามอเตอร์ใช้ gain ตามที่ส่ง ตัด sample ที่แรงบิดเกิน 95% ของ effort limit ออก (คอลัมน์ `sat%`) gain ที่ term ของมันเล็กเกินไป (kp = 0 ใน Passive, D term ตอนข้อต่อนิ่ง) จะไม่ถูก score
+2. **Replay (`--replay`, บันทึกตอนแขวน):** ส่ง lowcmd ที่บันทึกไว้เข้า MuJoCo โดยยึดลำตัวกลางอากาศ (orientation จาก IMU) แล้วเทียบ q จาก sim กับ q จริง `nrmse` > 0.3 หรือ `lag ms` มาก แปลว่า actuator ใน sim (armature, friction, delay) ต่างจากจริง ลอง `--armature train` (armature ตอนเทรน แทน 0.01 ใน MJCF) และ `--delay-ms N`
+
+ทดสอบแล้ว (29/10/2026): ข้อมูลจำลองที่ตั้ง kp ×0.7 + delay 10 ms ได้ `kp x` 0.70, `kd x` 1.00, delay 10 ms; `unitree_mujoco` + `g1_ctrl` ช่วง FixStand ขาได้ `kp x` 0.98–1.01 ส่วนแขนและเอวใน `unitree_mujoco` สั่นกลับไปมา ~160 ครั้ง/s แรงบิดชน ±25 Nm เพราะ kd 10 ของ FixStand สูงเกินไปสำหรับ PD แบบ explicit ที่ dt 2 ms (เป็นข้อจำกัดของ sim, driver มอเตอร์จริงคำนวณ PD ที่ความถี่สูงกว่ามาก)
+
+> รัน `unitree_mujoco` / `g1_ctrl` จาก shell ที่ source ROS แล้วจะ crash ที่ `dds_write.c ... iox_pub` เพราะโหลด `libddsc` ของ ROS ให้รันด้วย `env -u CYCLONEDDS_URI LD_LIBRARY_PATH=/opt/unitree_robotics/lib ./unitree_mujoco`
+
 ## 8. ห้ามทำรอบนี้
 
 - ห้ามเข้า state Velocity / ห้ามรัน ONNX ทุกตัว
 - ห้ามวางหุ่นลงพื้นตอนมีแรงบิด
-- ห้ามใช้ kp เต็มจาก `config.yaml` ก่อนผ่านข้อค้าง FixStand 30 s ในหัวข้อ 6
+- ถ้าเริ่มด้วย kp ต่ำ ห้ามเพิ่มเป็นค่าเต็มก่อนผ่านข้อค้าง FixStand 30 s ในหัวข้อ 6 (ถ้าใช้ค่าเดิมของ Unitree ตั้งแต่แรก ต้องแขวนหุ่นและพร้อมกด LT + B)
 - ห้ามแก้ config หน้างานแล้วรันต่อทันที ยกเว้นการลด kp
 - ห้ามรันงานหนัก (ติดตั้ง Isaac Sim, เทรน, docker อื่น) บน luke-mini ระหว่างต่อหุ่น
 
