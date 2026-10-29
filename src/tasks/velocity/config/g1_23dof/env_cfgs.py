@@ -385,3 +385,20 @@ def unitree_g1_23dof_rough_blind_hist5_yaw_env_cfg(
   # About 70% of moving envs now sample a constant wz in [-1, 1] like the joystick.
   twist_cmd.rel_heading_envs = 0.3
   return cfg
+
+
+def unitree_g1_23dof_rough_blind_hist5_yaw_stand_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Hist5 yaw + stand fine-tune: resume the yaw fine-tune (model_17998) to stand still.
+
+  After the yaw fine-tune the policy sways while standing (headless, cmd = 0: joint
+  velocity std 0.06 rad/s, yaw-rate std 0.076 rad/s; P3b and Hist5 ~0). With
+  rel_heading_envs 0.3 most moving envs get a uniform wz, and only 5% of envs are
+  told to stand, so standing gets little practice. Triple the standing share.
+  """
+  cfg = unitree_g1_23dof_rough_blind_hist5_yaw_env_cfg(play=play)
+  twist_cmd = cfg.commands["twist"]
+  assert isinstance(twist_cmd, UniformVelocityCommandCfg)
+  twist_cmd.rel_standing_envs = 0.15
+  return cfg
