@@ -53,7 +53,7 @@
 | unitree_rl_mjlab `phase3-delay-dr` | `843a27a` | task Phase 4 Rough-Blind |
 | | `67353a7` | เครื่องมือตรวจหุ่นจริงแบบอ่านอย่างเดียว + ผล 28/10 |
 | | `54df935` | `lowcmd_monitor`, `pd_check`, `vel_eval`, `tau_est` |
-| | (29/10 เย็น) | soft start, checklist หัวข้อ 9, `gain_check`, `vel_eval --hang`, สคริปต์ sim2sim, โฟลเดอร์ `hist5_yawft` / `hist5_yawstand`, เอกสารชุดนี้ |
+| | `32a9f5e` | soft start, checklist หัวข้อ 9, `gain_check`, `vel_eval --hang`, สคริปต์ sim2sim, โฟลเดอร์ `hist5_yawft` / `hist5_yawstand`, เอกสารชุดนี้ |
 | unitree_rl_mjlab `hist5-from-scratch` | `c779814`, `0100001` | task Hist5 จากศูนย์ + แก้ PYTHONPATH ของ worktree |
 | | `81416d4` | task yaw fine-tune + `vel_eval` |
 | | `3901e56` | task YawStand |
