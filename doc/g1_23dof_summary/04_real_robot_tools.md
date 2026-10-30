@@ -53,6 +53,7 @@ projected gravity = (2(wy−xz), −2(wx+yz), −(w²−x²−y²+z²))
 | `lowcmd_monitor.py` | `rt/lowcmd` | q_des / kp / kd / tau ทั้ง 29 slot, บอกว่า gain ตรงกับ Passive / FixStand / Velocity, ไฮไลต์ `MISMATCH`, `--log` CSV |
 | `pd_check.py` | CSV state + cmd | torque check (`kp x`, `kd x`, delay), `--replay` เทียบกับ MuJoCo ([03_kp_kd.md](03_kp_kd.md#4-ตรวจ-4-ชั้น)) |
 | `gain_check.py` | ไฟล์ policy | ตรวจ `deploy.yaml` กับ metadata ใน ONNX (ไม่ใช้หุ่น) |
+| `motion_mode.py` | RPC `motion_switcher` | `check` (อ่านอย่างเดียว) / `release` (ปิด controller ในตัว แทน L2 + R2) / `select <name>` (เปิดกลับโดยไม่ต้องรีบูต, ปฏิเสธถ้ายังมี `rt/lowcmd`) ทำตอนแขวนเท่านั้น ยังไม่ได้ทดสอบกับหุ่นจริง |
 | `vel_eval.py` | – | sim2sim headless ([02_sim2sim_eval.md](02_sim2sim_eval.md)) |
 | `sim2sim_policy.sh`, `sim_speed_monitor.py` | – | `unitree_mujoco` + `g1_ctrl` กับ policy ที่เลือก |
 | g1pilot `src/docker/validate_viewer.py`, `validate_byobu.sh` | ROS 2 topics | dashboard `/joint_states`, `/g1pilot/motor_state`, `/g1pilot/imu` ใน container `g1pilot-dev` |
