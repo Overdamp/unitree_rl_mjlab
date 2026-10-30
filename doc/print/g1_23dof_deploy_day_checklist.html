@@ -82,7 +82,7 @@ python deploy/robots/g1_23dof/scripts/gain_check.py $P   # PASS</pre>
 <ul>
   <li>เปิดหุ่น รอจนเข้า zero-torque หรือ damping ระหว่างนี้ T4 รัน: <code>python deploy/robots/g1_23dof/scripts/motion_mode.py check</code> แล้วจดชื่อโหมด: <span class="blank"></span></li>
   <li>รีโมต (หุ่น<b>แขวนอยู่</b> ห้ามทำตอนนั่ง/นอน): <b>L2 + B</b> (Damping) แล้ว <b>L2 + R2</b> (debug mode)</li>
-  <li>T4 รัน <code>motion_mode.py check</code> อีกครั้ง → <code>name=''</code> (released / debug)</li>
+  <li>T4 รัน <code>motion_mode.py check</code> อีกครั้ง → <code>name=''</code> (released / debug) · ถ้ายังเป็น <code>'ai'</code> (30/10: จอยสั่นอย่างเดียว) → T4 <code>motion_mode.py release</code> พิมพ์ <code>yes</code> (หุ่นต้องแขวน จะปวกทันที)</li>
   <li>T1 ทุก slot ที่ใช้ต้องมีอุณหภูมิและแรงดัน ≈ 52 V (ถ้า slot ไหน 0 V หรือ T = 0 → หยุด มอเตอร์หลุด)</li>
 </ul>
 <div class="stop"><b class="t">ข้าม L2 + A:</b> Unitree ใช้ L2 + A ยืนยัน debug แต่หุ่นจะเหยียดตัวตรง ·
@@ -143,7 +143,34 @@ python deploy/robots/g1_23dof/scripts/gain_check.py $P   # PASS</pre>
 </section>
 
 <section>
-<h2>7. Deploy P3b บนพื้น (ทำเมื่อข้อ 6 ผ่านเท่านั้น)</h2>
+<h2>6b. FixStand ด้วย gain ที่เทรน (BeyondMimic) บน gantry · เวลาเริ่ม <span class="blank" style="min-width:20mm"></span></h2>
+<p class="small">ข้อ 5 วัดได้แค่ kp 40–200 / kd 2.5–10 · policy ใช้แขน kp 14.3 / kd 0.9, ขา kd 1.8–6.3 · สำเนา <code>g1_ctrl</code> ใน <code>/tmp</code> (config จริงไม่ถูกแตะ) <b>เข้า Velocity ไม่ได้</b></p>
+<pre><span class="term">T3 ปิด:</span> Ctrl-C · tmux kill-session -t g1deploy
+deploy/robots/g1_23dof/scripts/fixstand_train_gains.sh
+G1_CTRL_DIR=/tmp/g1_fixstand_train/build deploy/robots/g1_23dof/scripts/deploy_byobu.sh 1 bm</pre>
+<ul>
+  <li>Enter T1 → T2 → T3 (ชื่อช่อง T3 ลงท้าย <code>/tmp/g1_fixstand_train/build</code>) · LT + ↑ → T2 = <b><code>gains match: Velocity</code></b> (ปกติ: gain ชุดเดียวกัน)</li>
+  <li>ค้าง 30 s: แขนห้อยห่างท่ามากกว่าข้อ 5 แต่ต้องนิ่ง · ดันทีละกลุ่มแล้วปล่อย + <b>ดึงออกแล้วปล่อยทันที</b> · แกว่งไม่หยุด → LT + B</li>
+  <li>LT + B → Ctrl-C T1/T2 → T4 <code>pd_check.py ~/g1_state_&lt;date&gt;_bm1.csv ~/g1_cmd_&lt;date&gt;_bm1.csv</code> ช่วง <code>Velocity</code>: kp x 0.8–1.2, kd x 0.5–1.5 ผล: <span class="blank"></span></li>
+  <li>จบ: Ctrl-C T3 · kill session · เปิด <code>deploy_byobu.sh</code> ปกติก่อนข้อ 7</li>
+</ul>
+</section>
+
+<section>
+<h2>6c. สั่งท่าทีละ joint (<code>sysid_motion.py</code>, แทน g1_ctrl) · เวลาเริ่ม <span class="blank" style="min-width:20mm"></span></h2>
+<pre><span class="term">T3:</span> ไม่รัน g1_ctrl · T1/T2 บันทึก (deploy_byobu.sh 1 sysid)
+<span class="term">T4:</span> python deploy/robots/g1_23dof/scripts/sysid_motion.py --dry-run
+    python deploy/robots/g1_23dof/scripts/sysid_motion.py --groups armL --kinds step --segments ~/sysid_seg_test.csv
+    python deploy/robots/g1_23dof/scripts/sysid_motion.py --segments ~/sysid_seg_$(date +%Y%m%d).csv</pre>
+<ul>
+  <li>รอบลอง (~30 s): <b>กด L2 + B กลางทาง → ต้องขึ้น <code>-&gt; damping (remote L2 + B)</code></b> (ยังไม่เคยลองกับหุ่นจริง) ผล: <span class="blank"></span></li>
+  <li>รอบเต็ม ~8 นาที: แกว่งไม่หยุด / ชนตัว / เสียงผิดปกติ → L2 + B · หยุดเองเมื่อ LowState ขาด, ห่างเป้า &gt; 0.5 rad, &gt; 70 °C, มอเตอร์หลุด</li>
+  <li>จบ: Ctrl-C T1/T2 → <code>pd_check.py</code> + <code>--replay --t0 --t1</code> ตามไฟล์ segments, <code>--armature mjcf</code> เทียบ <code>train</code></li>
+</ul>
+</section>
+
+<section>
+<h2>7. Deploy P3b บนพื้น (ทำเมื่อข้อ 6 และ 6b ผ่านเท่านั้น)</h2>
 <pre><span class="term">T1:</span> python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --iface enp43s0 \
       --log ~/g1_state_20261030_walk$RUN.csv
 <span class="term">T2:</span> python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py --iface enp43s0 \

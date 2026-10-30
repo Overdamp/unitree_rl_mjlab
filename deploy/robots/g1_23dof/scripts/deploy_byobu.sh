@@ -15,6 +15,8 @@
 # Usage: deploy/robots/g1_23dof/scripts/deploy_byobu.sh [RUN] [TAG]
 #        RUN = 1, 2, ... (default 1); TAG = run (hung, kp/kd check) or walk (default run)
 #        logs: ~/g1_state_<date>_<TAG><RUN>.csv, ~/g1_cmd_<date>_<TAG><RUN>.csv
+#        G1_CTRL_DIR=<dir> runs g1_ctrl from another build dir (e.g. the scratch copy
+#        made by fixstand_train_gains.sh, TAG bm)
 #
 # Inside byobu: click a pane (mouse is on) or Shift + arrows to move between panes
 # (Alt + arrows switch windows, not panes),
@@ -27,6 +29,7 @@ SESSION="${SESSION:-g1deploy}"
 IFACE="${IFACE:-enp43s0}"
 ROBOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_ROOT="$(cd "${ROBOT_DIR}/../../.." && pwd)"
+G1_CTRL_DIR="${G1_CTRL_DIR:-${ROBOT_DIR}/build}"
 S=deploy/robots/g1_23dof/scripts
 
 if tmux has-session -t "${SESSION}" 2>/dev/null; then
@@ -36,6 +39,10 @@ if tmux has-session -t "${SESSION}" 2>/dev/null; then
 fi
 if pgrep -x g1_ctrl >/dev/null; then
   echo "g1_ctrl is already running outside this session; stop it first." >&2
+  exit 1
+fi
+if [ ! -x "${G1_CTRL_DIR}/g1_ctrl" ]; then
+  echo "No ${G1_CTRL_DIR}/g1_ctrl" >&2
   exit 1
 fi
 
@@ -52,7 +59,7 @@ tmux set-option -t "${SESSION}" pane-border-status top
 tmux set-option -t "${SESSION}" pane-border-format ' #{pane_title} '
 tmux select-pane -t "${P1}" -T "T1 lowstate_monitor (read-only)"
 tmux select-pane -t "${P2}" -T "T2 lowcmd_monitor (read-only)"
-tmux select-pane -t "${P3}" -T "T3 g1_ctrl (SENDS MOTOR COMMANDS)"
+tmux select-pane -t "${P3}" -T "T3 g1_ctrl (SENDS MOTOR COMMANDS) ${G1_CTRL_DIR}"
 tmux select-pane -t "${P4}" -T "T4 checks / motion_mode / pd_check"
 
 for p in "${P1}" "${P2}" "${P3}" "${P4}"; do
@@ -63,9 +70,10 @@ sleep 1.5
 # Typed, not run.
 tmux send-keys -t "${P1}" "python ${S}/lowstate_monitor.py --iface ${IFACE} --log ~/g1_state_\${D}_\${TAG}\${RUN}.csv"
 tmux send-keys -t "${P2}" "python ${S}/lowcmd_monitor.py --iface ${IFACE} --log ~/g1_cmd_\${D}_\${TAG}\${RUN}.csv"
-tmux send-keys -t "${P3}" "cd ${ROBOT_DIR}/build && env -u CYCLONEDDS_URI LD_LIBRARY_PATH=/opt/unitree_robotics/lib ./g1_ctrl --network ${IFACE}"
-tmux send-keys -t "${P4}" "echo '1) ping -c 3 192.168.123.161   2) gain_check   3) motion_mode check   4) pd_check (after T1/T2 Ctrl-C)'; \
+tmux send-keys -t "${P3}" "cd ${G1_CTRL_DIR} && env -u CYCLONEDDS_URI LD_LIBRARY_PATH=/opt/unitree_robotics/lib ./g1_ctrl --network ${IFACE}"
+tmux send-keys -t "${P4}" "echo '1) ping   2) gain_check   3) motion_mode check   4) motion_mode release (if L2+R2 fails)   5) pd_check (after T1/T2 Ctrl-C)'; \
 history -s \"python ${S}/pd_check.py ~/g1_state_\${D}_\${TAG}\${RUN}.csv ~/g1_cmd_\${D}_\${TAG}\${RUN}.csv\"; \
+history -s \"python ${S}/motion_mode.py release --iface ${IFACE}\"; \
 history -s \"python ${S}/motion_mode.py check --iface ${IFACE}\"; \
 history -s \"python ${S}/gain_check.py ${S%/scripts}/config/policy/velocity/v0\"; \
 history -s \"ping -c 3 192.168.123.161\"" Enter

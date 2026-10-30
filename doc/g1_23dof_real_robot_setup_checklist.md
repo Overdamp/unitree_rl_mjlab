@@ -278,6 +278,46 @@ python deploy/robots/g1_23dof/scripts/pd_check.py ~/g1_state_X.csv ~/g1_cmd_X.cs
 | delay ที่ fit ได้ > 10 ms | network หรือ PC หน่วง | ดู gap ใน `lowstate_monitor` ปิดงานหนักบน PC |
 | ข้อเท้า `kp x` แปลก | linkage ข้อเท้า firmware แปลงแรงบิดให้ | จดไว้ ถ้ายืนใน 9.2 ปกติถือว่าผ่าน |
 
+ผล 30/10/2026: ผ่าน (FixStand `kp x` 0.89–1.09, แขน `kd x` 0.92–0.98, delay 3 ms; Passive `kd x` 0.94–0.98) right ankle roll ได้ 0.67 เพราะ `tau_est` มีออฟเซ็ตคงที่ ~−0.26 Nm ถ้า fit แบบมีออฟเซ็ตได้ 0.91 · วันนั้นกด L2 + R2 แล้วจอยสั่นอย่างเดียว (`name='ai'`) ใช้ `motion_mode.py release` แทนได้ผล · มอเตอร์ 25/26 หลุดหลังกด L2 + A ตอนนั่ง รีบูตไม่หาย ถอดแบต ~2 นาทีแล้วหาย
+
+### 9.1b ขั้น 1b: FixStand ด้วย gain ที่เทรน (BeyondMimic) บน gantry
+
+9.1 วัดได้แค่ช่วง kp 40–200 / kd 2.5–10 แต่ policy ใช้แขน kp 14.3 / kd 0.9 และขา kd 1.8–6.3 ขั้นนี้วัดค่าเหล่านั้นตรงๆ ก่อนลงพื้น ใช้สำเนา `g1_ctrl` ใน `/tmp` ที่ FixStand ใช้ stiffness/damping จาก `deploy.yaml` ของ policy (config จริงไม่ถูกแตะ) และ**ตัด RT + A ออก เข้า Velocity ไม่ได้**
+
+```bash
+cd ~/nvidia/unitree/unitree_rl_mjlab
+deploy/robots/g1_23dof/scripts/fixstand_train_gains.sh            # ค่าเริ่มต้น v0 (P3b)
+G1_CTRL_DIR=/tmp/g1_fixstand_train/build deploy/robots/g1_23dof/scripts/deploy_byobu.sh 1 bm
+```
+
+- [ ] หุ่นแขวน เท้าลอย, debug mode (`motion_mode.py check` → `name=''`), T1/T2 บันทึก, T3 ชื่อช่องลงท้าย `/tmp/g1_fixstand_train/build`
+- [ ] Passive แล้ว LT + ↑: `lowcmd_monitor` ขึ้น **`gains match: Velocity`** (gain ชุดเดียวกับ Velocity เป็นเรื่องปกติ) kp 40.2/99.1/28.5/14.3, slot ที่ไม่ใช้ kp = kd = 0
+- [ ] ค้าง 30 s: แขนห้อยห่างท่ามากกว่า 9.1 (kp 14.3) แต่ต้องนิ่ง ไม่สั่น ไม่แกว่งเอง
+- [ ] ดันทีละกลุ่ม 0.1–0.2 rad ค้าง 1 s แล้วปล่อย + **ดึงออกแล้วปล่อยทันที** (ช่วงที่ joint เด้งกลับเองใช้เทียบ armature ใน `pd_check --replay` ได้) กลับช้ากว่า 9.1 เป็นเรื่องปกติ แกว่งหลายรอบไม่หยุด → LT + B
+- [ ] LT + B → Ctrl-C T1/T2 → `pd_check.py ~/g1_state_<date>_bm1.csv ~/g1_cmd_<date>_bm1.csv` ช่วงที่ขึ้นชื่อ `Velocity`: `kp x` 0.8–1.2 และ `kd x` 0.5–1.5 (kd 0.9 ของแขนเป็นตัวที่ยังไม่เคยวัด)
+- [ ] จบ: Ctrl-C T3, `tmux kill-session -t g1deploy` แล้วเปิด `deploy_byobu.sh` ปกติ (ไม่มี `G1_CTRL_DIR`) ก่อนไป 9.2 เพราะสำเนานี้เข้า Velocity ไม่ได้
+
+log ใหญ่ (30/10: 4 GB ใน ~40 นาที) ถ้าจะ `--replay` ให้ตัดเฉพาะช่วงด้วย `awk` ตามคอลัมน์ `t` ก่อน
+
+### 9.1c ขั้น 1c: สั่งท่าทีละ joint (`sysid_motion.py`) บน gantry
+
+ดันด้วยมือสู้ kp 100–200 ไม่ไหว และ replay ใช้ไม่ได้เพราะ `q_des` คงที่ (30/10: nrmse ≈ 1 ทุก joint) สคริปต์นี้ส่ง `rt/lowcmd` เอง**แทน `g1_ctrl`** ไล่ท่ายืนใน 3 s แล้วขยับทีละ joint: step ±A (1.5 s) และ chirp 0.3→2.5 Hz (12 s) ด้วย gain ที่เทรน (`--gains train`, ค่าเริ่มต้น) หรือ Unitree (`--gains unitree`) ทั้งชุด ~8 นาที แผนถูกตรวจกับ limit MJCF (เผื่อ 0.1 rad) และความเร็วเป้าหมาย ≤ 6 rad/s ก่อนส่ง
+
+หยุดเข้า damping (kp 0) เองเมื่อ: **L2 + B**, Ctrl-C, LowState ขาด > 50 ms, joint ห่างเป้า > 0.5 rad, มอเตอร์ > 70 °C, มอเตอร์หลุด (`vol` 0 / `motorstate` ≠ 0) และตอนจบแผน ไม่ยอมเริ่มถ้ายังมี `rt/lowcmd` (g1_ctrl) หรือ controller ในตัวยังไม่ปล่อย · ทดสอบใน `unitree_mujoco` (domain 1, elastic band) 30/10: ครบแผน, ไม่ยอมเริ่มซ้อน, Ctrl-C และ sim ตาย → damping ผ่าน · L2 + B ตรวจได้แค่ด้วย unit test (sim ไม่มีจอย) **ต้องลองกับหุ่นจริงก่อนรอบเต็ม**
+
+```bash
+# T3 ไม่ต้องเปิด g1_ctrl (Ctrl-C ถ้าเปิดอยู่) · T1/T2 บันทึกตามปกติ (deploy_byobu.sh 1 sysid)
+python deploy/robots/g1_23dof/scripts/sysid_motion.py --dry-run                      # ดูแผน
+python deploy/robots/g1_23dof/scripts/sysid_motion.py --groups armL --kinds step \
+    --segments ~/sysid_seg_test.csv                                                   # รอบลอง ~30 s: กด L2 + B กลางทาง
+python deploy/robots/g1_23dof/scripts/sysid_motion.py --segments ~/sysid_seg_$(date +%Y%m%d).csv   # รอบเต็ม
+```
+
+- [ ] หุ่นแขวน เท้าลอย รอบตัวว่าง, `motion_mode.py check` → `name=''`, `g1_ctrl` ไม่ได้รัน
+- [ ] รอบลอง: ไล่ท่ายืนนุ่มๆ, แขนซ้ายขยับ, **กด L2 + B แล้วต้องขึ้น `-> damping (remote L2 + B)`** และแขนคลาย
+- [ ] รอบเต็ม: ดูทุกท่า ถ้าแกว่งไม่หยุด / ชนตัว / เสียงผิดปกติ → L2 + B · เลือกกลุ่มได้ด้วย `--groups armL,armR,waist,legL,legR`, `--joints elbow,knee`
+- [ ] Ctrl-C T1/T2 → `pd_check.py` (ช่วงจะขึ้นชื่อ `Velocity` ถ้าใช้ gain ที่เทรน) และ `--replay --t0 --t1` ตามเวลาใน `--segments` (คอลัมน์ `t0`/`t1` ใช้นาฬิกาเดียวกับ log ลบด้วย `t` แถวแรกของ lowstate) เทียบ `--armature mjcf` กับ `train`
+
 ### 9.2 ขั้น 2: ยืนบนพื้น (Velocity, stick = 0)
 
 - [ ] เริ่มจาก FixStand บน gantry แล้วหย่อนลงจนเท้าแตะพื้นเต็มเท้า เชือกยังรับไว้แต่หย่อนพอให้หุ่นรับน้ำหนักเอง
