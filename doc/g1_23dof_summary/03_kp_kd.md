@@ -5,6 +5,7 @@
 - [1. kp/kd คืออะไร และอยู่ที่ไหน](#1-kpkd-คืออะไร-และอยู่ที่ไหน)
 - [2. ค่าที่เราใช้มาจากไหน](#2-ค่าที่เราใช้มาจากไหน)
 - [3. เทียบกับที่อื่น](#3-เทียบกับที่อื่น)
+  - [3.1 ทำไมใช้แบบ BeyondMimic ไม่ใช่ 100/150/40](#31-ทำไมใช้แบบ-beyondmimic-ไม่ใช่-10015040)
 - [4. ตรวจ 4 ชั้น](#4-ตรวจ-4-ชั้น)
 - [5. ผลทดสอบเครื่องมือ](#5-ผลทดสอบเครื่องมือ)
 - [6. จุดที่ต้องตรวจต่อ](#6-จุดที่ต้องตรวจต่อ)
@@ -68,6 +69,31 @@ action scale = 0.25 × effort / kp
 - ตัวอย่าง SDK เป็นแค่ demo
 
 แหล่งอ้างอิง: [unitree_rl_gym g1_config.py](https://github.com/unitreerobotics/unitree_rl_gym/blob/main/legged_gym/envs/g1/g1_config.py), [unitree_rl_lab unitree.py](https://github.com/unitreerobotics/unitree_rl_lab/blob/main/source/unitree_rl_lab/unitree_rl_lab/assets/robots/unitree.py), [mjlab g1_constants.py](https://github.com/mujocolab/mjlab/blob/main/src/mjlab/asset_zoo/robots/unitree_g1/g1_constants.py), [BeyondMimic arXiv 2508.08241](https://arxiv.org/pdf/2508.08241), [unitree_sdk2 g1_ankle_swing_example.cpp](https://github.com/unitreerobotics/unitree_sdk2/blob/main/example/g1/low_level/g1_ankle_swing_example.cpp)
+
+### 3.1 ทำไมใช้แบบ BeyondMimic ไม่ใช่ 100/150/40
+
+**เราไม่ได้เลือกเอง เป็นค่า default ของ repo ที่ fork มา:** `g1_23dof_constants.py` (สูตร armature·ω²) มีตั้งแต่ commit แรกของ unitree_rl_mjlab (ผู้ดูแลฝั่ง Unitree, `klavier`) ประวัติมีแค่การ reformat (`4a734a8`) ฝั่งเราไม่เคยแก้ไฟล์นี้ repo สร้างบน mjlab ซึ่งใช้สูตรเดียวกันกับ G1 ทุกรุ่น ที่เราแก้คือฝั่ง deploy (`233aac8` "Fix 23-dof gains mapping") ให้ `deploy.yaml` ส่งค่าเดียวกับตอนเทรนไปถูก slot
+
+| repo | default |
+|---|---|
+| **unitree_rl_mjlab (ที่เราใช้)**, mjlab | BeyondMimic: armature·ω² (hip 40.2, knee 99.1, ankle 28.5, แขน 14.3) |
+| unitree_rl_gym, unitree_rl_lab | ปรับมือ (hip 100, knee 150, ankle 40, แขน 40) |
+| FixStand ใน `g1_ctrl` | ปรับมือ (ชุดเดียวกับข้างบน) |
+
+**เหตุผลของแนวทางนี้ (BeyondMimic / mjlab):**
+
+1. อิงฟิสิกส์ของมอเตอร์: kp = armature × ω² ทำให้ทุก joint มีความถี่ตอบสนองเท่ากัน (10 Hz) ไม่ว่ามอเตอร์จะใหญ่หรือเล็ก ค่าปรับมือให้ทั้งกลุ่ม 100 เท่ากันแม้มอเตอร์ต่างขนาด
+2. ข้อต่อนุ่ม (10 Hz ถือว่าต่ำ) ช่วย sim2real: แรงกระแทกตอนเท้าลงพื้นเบาลง ไวต่อความต่าง sim กับจริงน้อยลง (มวล, friction, delay) BeyondMimic ใช้วิธีนี้ deploy บน G1 จริงสำเร็จ
+3. ζ = 2: armature นับแค่โรเตอร์ ไม่นับมวล link ความเฉื่อยจริงสูงกว่าที่คำนวณ จึงหน่วงเผื่อไม่ให้แกว่ง
+4. ค่าอื่นทั้งระบบตั้งให้เข้ากับ gain ชุดนี้: action scale = 0.25 × effort / kp, น้ำหนัก reward และช่วง DR ใน mjlab ถ้าเปลี่ยน gain ต้องปรับส่วนอื่นตาม
+
+**ข้อเสีย:**
+
+- ข้อต่ออ่อนกว่า ไปไม่ถึงเป้าพอดี policy ต้องเรียนสั่งเผื่อเอง
+- แขน kp 14.3 อ่อน แขนตกจากท่าเล็กน้อยเพราะแรงโน้มถ่วง
+- ความเฉื่อยโรเตอร์ในสูตรยังไม่ได้ยืนยันกับมอเตอร์จริง (`pd_check --replay` ใช้ตอบ)
+
+**ควรเปลี่ยนเป็นชุดของ unitree_rl_gym ไหม:** ตอนนี้ไม่ควร policy ทุกตัว (P3b, yaw_ft, yaw_stand) เทรนกับชุดนี้และต้อง deploy ด้วยชุดเดียวกัน เปลี่ยนต้องเทรนใหม่และปรับ action scale และใน sim ยังไม่พบปัญหาที่ชี้ว่า gain ผิด ถ้าผล `pd_check` หรือการเดินจริงชี้ว่าข้อต่ออ่อนเกิน (ยืนแล้วทรุด, ตามคำสั่งไม่ทัน) ค่อยเทรนรุ่นเปรียบเทียบที่ใช้ ω สูงขึ้นหรือชุดของ unitree_rl_gym
 
 ## 4. ตรวจ 4 ชั้น
 
