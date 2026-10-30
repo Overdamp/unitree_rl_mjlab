@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>G1-23DoF Manager Config</title>
+<style>
+  @page { size: A4 landscape; margin: 9mm 10mm 10mm 10mm; }
+  body { font-family: "Noto Sans Thai", "Noto Sans", sans-serif; font-size: 8.4pt; line-height: 1.25; color: #000; background: #fff; margin: 0; }
+  h1 { font-size: 14pt; margin: 0 0 2pt 0; }
+  .meta { font-size: 8pt; margin-bottom: 4pt; }
+  h2 { font-size: 10.5pt; background: #e3e3e3; padding: 2pt 5pt; margin: 7pt 0 3pt 0; break-after: avoid; }
+  h3 { font-size: 9pt; margin: 4pt 0 2pt 0; break-after: avoid; }
+  table { border-collapse: collapse; width: 100%; margin: 1pt 0 4pt 0; break-inside: auto; }
+  tr { break-inside: avoid; }
+  th, td { border: 1px solid #999; padding: 1.2pt 3.5pt; text-align: left; vertical-align: top; }
+  th { background: #efefef; }
+  td.n { text-align: right; white-space: nowrap; }
+  code { font-family: "DejaVu Sans Mono", monospace; font-size: 7.6pt; }
+  .diff { background: #fff3c4; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 6pt; }
+  .small { font-size: 7.6pt; }
+  .pb { break-before: page; }
+  section { break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<h1>G1-23DoF Velocity: สรุป config แต่ละ manager (mjlab ManagerBasedRlEnv)</h1>
+<div class="meta">ค่าหลัก = <b>P3b</b> (task <code>Unitree-G1-23Dof-Flat</code>, run <code>2026-10-22_17-02-19</code>, policy ที่ deploy ใน <code>config/policy/velocity/v0</code>) ·
+คอลัมน์ <span class="diff">&nbsp;yaw_stand&nbsp;</span> = <code>Unitree-G1-23Dof-Rough-Blind-Hist5-YawStand</code> (run <code>2026-10-29_17-01-49_yaw_stand_ft</code>) แสดงเฉพาะค่าที่ต่างจาก P3b ·
+ที่มา: <code>doc/g1_23dof_*_manager.md</code>, <code>doc/g1_23dof_scene.md</code>, <code>src/tasks/velocity/config/g1_23dof/env_cfgs.py</code> · 30/10/2026</div>
+
+<table class="small">
+  <tr><th>ลำดับใน 1 policy step (dt 0.02 s = physics 0.005 s × decimation 4)</th></tr>
+  <tr><td>Action (process) → physics 4 substep (apply action + DelayedActuator) → Termination → Reward → Curriculum (ตอน reset) → Event reset → Command → Event interval → Observation → Metrics</td></tr>
+</table>
+
+<section>
+<h2>1. Scene</h2>
+<table>
+  <tr><th style="width:20%">field</th><th style="width:38%">P3b (Flat)</th><th class="diff" style="width:24%">yaw_stand (Rough-Blind)</th><th>หมายเหตุ</th></tr>
+  <tr><td><code>num_envs</code> / <code>env_spacing</code></td><td>1024 / 2.0 m</td><td></td><td>CLI <code>--env.scene.num-envs=1024</code></td></tr>
+  <tr><td>terrain</td><td><code>plane</code> (ไม่มี generator)</td><td class="diff"><code>generator</code> ROUGH ลดความยาก: บันได ≤ 8 cm, ลาด ≤ 0.4 (~22°), rough 2–6 cm, wave ≤ 10 cm, เรียบ 20%; 10 แถว × 20 คอลัมน์; <code>max_init_terrain_level</code> 1</td><td>blind: ไม่มี <code>terrain_scan</code> ทั้งคู่</td></tr>
+  <tr><td>robot</td><td colspan="2"><code>g1_23dof.xml</code>, ท่าเริ่ม pelvis z 0.8 m (hip_pitch −0.1, knee 0.3, ankle_pitch −0.2, shoulder_pitch 0.35, shoulder_roll ±0.18, elbow 0.87); actuator 4 กลุ่มห่อ <code>DelayedActuatorCfg</code> (0–4 step); <code>soft_joint_pos_limit_factor</code> 0.9; self-collision เปิด</td><td>เท้า 7 geom/ข้าง friction 0.6, priority 1</td></tr>
+  <tr><td>sensors</td><td colspan="2"><code>feet_ground_contact</code> (เท้า ↔ terrain, found+force, air time) · <code>self_collision</code> (pelvis subtree ↔ ตัวเอง, history 4) · IMU <code>imu_ang_vel</code> / <code>imu_lin_vel</code> ที่ <code>imu_in_pelvis</code> · <code>root_angmom</code></td><td></td></tr>
+  <tr><td>sim</td><td>timestep 0.005, implicitfast, newton 10/20, ccd 50, njmax 300, nconmax auto, contact maxmatch 64</td><td class="diff">ccd 500, nconmax 48, contact maxmatch 500</td><td>episode 20 s = 1000 step</td></tr>
+</table>
+</section>
+
+<section>
+<h2>2. Observation</h2>
+<div class="two">
+<div>
+<h3>Actor (policy input)</h3>
+<table>
+  <tr><th>term</th><th>dim</th><th>ค่า</th><th>noise ±</th></tr>
+  <tr><td><code>base_ang_vel</code></td><td class="n">3</td><td>gyro pelvis (rad/s)</td><td>0.2</td></tr>
+  <tr><td><code>projected_gravity</code></td><td class="n">3</td><td>gravity ใน body frame</td><td>0.05</td></tr>
+  <tr><td><code>command</code></td><td class="n">3</td><td>(vx, vy, ωz)</td><td>—</td></tr>
+  <tr><td><code>phase</code></td><td class="n">2</td><td>sin/cos clock 0.6 s, = 0 ถ้า ‖cmd‖ &lt; 0.1</td><td>—</td></tr>
+  <tr><td><code>joint_pos</code></td><td class="n">23</td><td>q − q_default</td><td>0.01</td></tr>
+  <tr><td><code>joint_vel</code></td><td class="n">23</td><td>dq</td><td>1.5</td></tr>
+  <tr><td><code>actions</code></td><td class="n">23</td><td>raw action step ก่อน</td><td>—</td></tr>
+  <tr><td><b>รวม</b></td><td class="n"><b>80</b></td><td colspan="2" class="diff">yaw_stand: <b>history 5 → 400</b> (ต่อทีละ term เก่า → ใหม่, <code>flatten_history_dim</code>)</td></tr>
+</table>
+</div>
+<div>
+<h3>Critic (value input, ไม่มี noise)</h3>
+<table>
+  <tr><th>term</th><th>dim</th><th>มีบนหุ่นจริง</th></tr>
+  <tr><td>actor ทั้งหมด (1 เฟรม)</td><td class="n">80</td><td>✅</td></tr>
+  <tr><td><code>base_lin_vel</code></td><td class="n">3</td><td>❌</td></tr>
+  <tr><td><code>foot_height</code>, <code>foot_air_time</code>, <code>foot_contact</code></td><td class="n">2+2+2</td><td>❌</td></tr>
+  <tr><td><code>foot_contact_forces</code> (sign·log(1+|f|))</td><td class="n">6</td><td>❌</td></tr>
+  <tr><td><b>รวม</b></td><td class="n"><b>95</b></td><td>yaw_stand เท่ากัน (1 เฟรม)</td></tr>
+</table>
+<p class="small">obs normalization: empirical (ใน actor/critic ของ rsl_rl) · deploy: <code>deploy.yaml</code> ชื่อ term base_ang_vel, projected_gravity, velocity_commands, gait_phase, joint_pos_rel, joint_vel_rel, last_action (ลำดับเดียวกัน, hist5 ใส่ <code>history_length: 5</code>)</p>
+</div>
+</div>
+</section>
+
+<section class="pb">
+<h2>3. Action (<code>JointPositionAction</code>, 23 joint) · q_target = a × scale + default · PD: τ = kp(q_target − q) − kd·dq</h2>
+<table>
+  <tr><th>กลุ่ม (actuator)</th><th>joint (policy index → SDK slot)</th><th>default (rad)</th><th>scale</th><th>kp</th><th>kd</th><th>effort (Nm)</th><th>armature</th></tr>
+  <tr><td>7520-14</td><td>hip_pitch L/R (0, 6), hip_yaw L/R (2, 8), waist_yaw (12)</td><td>hip_pitch −0.10, อื่น 0</td><td class="n">0.548</td><td class="n">40.18</td><td class="n">2.558</td><td class="n">88</td><td class="n">0.01018</td></tr>
+  <tr><td>7520-22</td><td>hip_roll L/R (1, 7), knee L/R (3, 9)</td><td>knee 0.30, hip_roll 0</td><td class="n">0.351</td><td class="n">99.10</td><td class="n">6.309</td><td class="n">139</td><td class="n">0.02510</td></tr>
+  <tr><td>2×5020 (linkage)</td><td>ankle_pitch L/R (4, 10), ankle_roll L/R (5, 11)</td><td>ankle_pitch −0.20, roll 0</td><td class="n">0.439</td><td class="n">28.50</td><td class="n">1.814</td><td class="n">50</td><td class="n">0.00722</td></tr>
+  <tr><td>5020</td><td>shoulder_pitch/roll/yaw, elbow, wrist_roll L/R (13–22 → slot 15–19, 22–26)</td><td>sh_pitch 0.35, sh_roll ±0.18, elbow 0.87</td><td class="n">0.439</td><td class="n">14.25</td><td class="n">0.907</td><td class="n">25</td><td class="n">0.00361</td></tr>
+</table>
+<p class="small">kp = armature·ω², kd = 2ζ·armature·ω (ω = 2π·10 Hz, ζ = 2, สูตร BeyondMimic / default ของ unitree_rl_mjlab) · scale = 0.25 × effort / kp · <code>joint_ids_map</code> = [0–12, 15–19, 22–26] (slot 13, 14, 20, 21, 27, 28 ไม่ใช้) · yaw_stand: เหมือนกันทุกค่า · deploy: <code>clip: null</code>, soft start 0.5 s ตอนเข้า Velocity</p>
+</section>
+
+<section>
+<h2>4. Command (<code>twist</code>, <code>UniformVelocityCommandCfg</code>)</h2>
+<table>
+  <tr><th style="width:24%">field</th><th style="width:34%">P3b</th><th class="diff" style="width:24%">yaw_stand</th><th>ความหมาย</th></tr>
+  <tr><td><code>resampling_time_range</code></td><td>3–8 s</td><td></td><td>2–6 คำสั่งต่อ episode</td></tr>
+  <tr><td><code>heading_command</code> / stiffness</td><td>True / 0.5</td><td></td><td>ωz = clip(0.5 × heading error, ±1)</td></tr>
+  <tr><td><code>rel_heading_envs</code></td><td>1.0 (ทุก env ใช้ heading control)</td><td class="diff">0.3 (≈ 70% ได้ ωz คงที่แบบจอย)</td><td></td></tr>
+  <tr><td><code>rel_standing_envs</code></td><td>0.05</td><td class="diff">0.15</td><td>สัดส่วน env ที่สั่งให้ยืน</td></tr>
+  <tr><td>ช่วงคำสั่ง (หลัง curriculum)</td><td>vx −1.0…2.0, vy −1.0…1.0, ωz −1…1</td><td class="diff">vx −0.5…1.2, vy −0.5…0.5, ωz −1…1</td><td>deploy clamp: vx −0.5…1.0, vy ±0.5, ωz ±1</td></tr>
+  <tr><td>threshold ยืน / เดิน / วิ่ง</td><td colspan="2">phase: ‖(vx,vy,ωz)‖ &lt; 0.1 → 0 · reward: ‖(vx,vy)‖ + |ωz| ≤ 0.1 ยืน, &lt; 1.5 เดิน, ≥ 1.5 วิ่ง</td><td></td></tr>
+</table>
+</section>
+
+<section>
+<h2>5. Reward (คูณ dt ทุก step)</h2>
+<table>
+  <tr><th>term</th><th>weight P3b</th><th class="diff">yaw_stand</th><th>สูตร / พารามิเตอร์</th><th>ทำงานเมื่อ</th></tr>
+  <tr><td><code>track_linear_velocity</code></td><td class="n">+1.0</td><td class="diff n">+2.0</td><td>exp(−[(vx−cx)² + (vy−cy)² + 2vz²]/σ²), σ = 0.5</td><td>ตลอด</td></tr>
+  <tr><td><code>track_angular_velocity</code></td><td class="n">+1.0</td><td class="diff n">+2.0</td><td>exp(−[(ωz−cωz)² + 0.05(ωx²+ωy²)]/σ²), σ = 0.707</td><td>ตลอด</td></tr>
+  <tr><td><code>pose</code></td><td class="n">+1.0</td><td></td><td>exp(−mean[(q−q₀)²/std²]), std ตามโหมด (ยืน 0.05 ทุก joint; เดิน hip_pitch/knee 0.5, hip_roll/yaw, ankle_pitch, waist, sh_pitch 0.15, อื่น 0.1)</td><td>ตลอด</td></tr>
+  <tr><td><code>foot_gait</code></td><td class="n">+0.5</td><td></td><td>เท้าแตะพื้นตรงกับ clock (period 0.6 s, offset [0, 0.5])</td><td>เดิน</td></tr>
+  <tr><td><code>is_terminated</code></td><td class="n">−200</td><td></td><td>1 ถ้าจบเพราะล้ม</td><td>ล้ม</td></tr>
+  <tr><td><code>joint_pos_limits</code></td><td class="n">−10</td><td></td><td>Σ ระยะเกิน soft limit (90% range)</td><td>ตลอด</td></tr>
+  <tr><td><code>body_orientation_l2</code></td><td class="n">−1.0</td><td></td><td>gx² + gy² ของ torso_link</td><td>ตลอด</td></tr>
+  <tr><td><code>foot_clearance</code></td><td class="n">−1.0</td><td></td><td>Σ |z_foot − 0.10| × ‖v_foot,xy‖</td><td>เดิน</td></tr>
+  <tr><td><code>stand_still</code></td><td class="n">−1.0</td><td></td><td>Σ (q − q₀)²</td><td>ยืน</td></tr>
+  <tr><td><code>self_collisions</code></td><td class="n">−1.0</td><td></td><td>จำนวน substep ที่ชนตัวเอง &gt; 10 N</td><td>ตลอด</td></tr>
+  <tr><td><code>foot_slip</code></td><td class="n">−0.25</td><td></td><td>Σ ‖v_foot,xy‖² × แตะพื้น</td><td>เดิน</td></tr>
+  <tr><td><code>body_ang_vel</code> / <code>action_rate_l2</code></td><td class="n">−0.05 / −0.05</td><td></td><td>ωx² + ωy² (torso) / Σ(aₜ − aₜ₋₁)²</td><td>ตลอด</td></tr>
+  <tr><td><code>angular_momentum</code></td><td class="n">−0.025</td><td></td><td>‖L‖² ทั้งตัว</td><td>ตลอด</td></tr>
+  <tr><td><code>soft_landing</code> / <code>joint_acc_l2</code></td><td class="n">−0.001 / −2.5e-7</td><td></td><td>แรงตอนเท้าเพิ่งแตะ / Σ q̈²</td><td>เดิน / ตลอด</td></tr>
+</table>
+</section>
+
+<section class="pb">
+<h2>6. Termination</h2>
+<table>
+  <tr><th>term</th><th>ประเภท</th><th>เงื่อนไข</th><th>ผล</th><th>deploy (<code>g1_ctrl</code>) ที่เทียบได้</th></tr>
+  <tr><td><code>time_out</code></td><td>truncation</td><td>20 s (1000 step)</td><td>reset, PPO bootstrap, ไม่โดน −200</td><td>—</td></tr>
+  <tr><td><code>fell_over</code></td><td>termination</td><td>เอียง pelvis &gt; 70° (1.22 rad)</td><td>reset, <code>is_terminated</code> −200</td><td>เอียง &gt; 0.85 rad (48.7°) → Passive</td></tr>
+  <tr><td>(deploy เท่านั้น)</td><td></td><td>LowState ขาด 100 ms · LT + B · คีย์ <code>p</code> (sim)</td><td></td><td>→ Passive (kp 0, kd 2.5–6)</td></tr>
+</table>
+<p class="small">yaw_stand: เหมือนกัน · มีให้ใช้แต่ไม่ได้เปิด: <code>root_height_below_minimum</code>, <code>nan_detection</code>, <code>illegal_contact</code></p>
+</section>
+
+<section>
+<h2>7. Event (reset / interval / Domain Randomization)</h2>
+<table>
+  <tr><th>term</th><th>mode</th><th>ค่า</th><th>เพื่อ</th><th>phase</th></tr>
+  <tr><td><code>reset_base</code></td><td>reset</td><td>xy ±0.5 m, yaw ±π, v = 0</td><td>ตำแหน่ง/ทิศเริ่มสุ่ม</td><td>P1+</td></tr>
+  <tr><td><code>reset_robot_joints</code></td><td>reset</td><td>offset 0 (เริ่มท่า default)</td><td></td><td>P1+</td></tr>
+  <tr><td><code>push_robot</code></td><td>interval 5–6 s</td><td>Δv xy ±0.5, z ±0.4 m/s; roll/pitch ±0.52, yaw ±0.78 rad/s</td><td>รับแรงผลัก</td><td>P1+</td></tr>
+  <tr><td><code>foot_friction</code></td><td>startup</td><td>0.3–1.6 (nominal 0.6), ค่าเดียวทั้ง 14 geom</td><td>พื้นลื่น/หนืด</td><td>P1+</td></tr>
+  <tr><td><code>encoder_bias</code></td><td>startup</td><td>±0.015 rad ต่อ joint</td><td>encoder zero คลาด</td><td>P1+</td></tr>
+  <tr><td><code>base_com</code></td><td>startup</td><td>COM torso ±0.05 m ต่อแกน</td><td>กระจายน้ำหนัก</td><td>P1+</td></tr>
+  <tr><td><code>torso_mass_payload</code> / <code>limb_mass_scale</code></td><td>startup</td><td>torso −1.0…+3.5 kg / อื่น ×0.90–1.10</td><td>มวลจริงต่างโมเดล</td><td>P2+</td></tr>
+  <tr><td><code>joint_friction</code> / <code>joint_damping</code></td><td>startup</td><td>frictionloss 0–0.30 / damping 0–0.10</td><td>เกียร์, linkage</td><td>P2+</td></tr>
+  <tr><td><code>motor_pd_gains</code> / <code>motor_effort_limits</code></td><td>startup</td><td>kp, kd ×0.85–1.15 / effort ×0.85–1.05</td><td>มอเตอร์, แบต, ความร้อน</td><td>P2+</td></tr>
+  <tr><td><code>action_delay</code></td><td>reset</td><td>lag 0–4 physics step (0–20 ms) ทั้งตัว</td><td>delay DDS/loop</td><td>P3b (P3a 0–40 ms ล้มเหลว)</td></tr>
+</table>
+<p class="small">yaw_stand: DR ชุดเดียวกับ P3b ทั้งหมด · play: ลบ push, เพิ่ม randomize_terrain, DR startup ยังอยู่</p>
+</section>
+
+<section>
+<h2>8. Curriculum</h2>
+<table>
+  <tr><th>term</th><th>P3b (Flat)</th><th class="diff">yaw_stand (Rough-Blind)</th></tr>
+  <tr><td><code>command_vel</code></td><td>stage 0 (step &gt; 0): vx −0.5…1.0, vy ±0.5, ωz ±1 → stage 1 (step &gt; 120,000 ≈ iter 5000): vx −1.0…2.0, vy ±1.0; P3b อยู่ stage 1 ทั้ง run</td><td class="diff">stage เดียว: vx −0.5…1.2, vy ±0.5, ωz ±1</td></tr>
+  <tr><td><code>terrain_levels</code> (<code>terrain_levels_vel</code>)</td><td>ปิด (pop ใน Flat)</td><td class="diff">เปิด: เดินได้ &gt; ครึ่ง tile → ขึ้นระดับ; &lt; ครึ่งของระยะตามคำสั่ง → ลง; เกินระดับสูงสุด → สุ่มใหม่ (เฉลี่ยตอนผ่านหมด ≈ 4.5)</td></tr>
+</table>
+<p class="small"><code>common_step_counter</code> ถูกบันทึกใน checkpoint และกู้คืนตอน resume (stage ต่อเนื่องข้าม phase)</p>
+</section>
+
+<section>
+<h2>9. Metrics (TensorBoard)</h2>
+<table>
+  <tr><th>tag</th><th>มาจาก</th><th>ความหมาย / ดีคือ</th></tr>
+  <tr><td><code>Episode_Metrics/mean_action_acc</code></td><td>MetricsManager</td><td>|aₜ − 2aₜ₋₁ + aₜ₋₂| เฉลี่ย · ต่ำ = action นุ่ม</td></tr>
+  <tr><td><code>Metrics/twist/error_vel_xy</code>, <code>error_vel_yaw</code></td><td>Command</td><td>error การตามคำสั่ง สะสมต่อ step ÷ 400 · ต่ำ</td></tr>
+  <tr><td><code>Metrics/angular_momentum_mean</code>, <code>slip_velocity_mean</code>, <code>landing_force_mean</code></td><td>reward funcs</td><td>แกว่ง / เท้าไถล / ลงเท้าแรง · ต่ำ (น้ำหนักหุ่น ≈ 330 N)</td></tr>
+  <tr><td><code>Episode_Reward/*</code></td><td>Reward</td><td>ผลรวมต่อ episode ÷ 20 s ต่อ term</td></tr>
+  <tr><td><code>Episode_Termination/fell_over</code>, <code>time_out</code></td><td>Termination</td><td>จำนวน env ที่จบด้วยเหตุนั้นในชุดที่ reset (ไม่ใช่สัดส่วน)</td></tr>
+  <tr><td><code>Curriculum/terrain_levels</code></td><td>Curriculum</td><td>ระดับ terrain เฉลี่ย (Rough เท่านั้น)</td></tr>
+  <tr><td><code>Train/mean_reward</code>, <code>mean_episode_length</code>; <code>Policy/mean_std</code></td><td>rsl_rl / PPO</td><td>reward ต่อ episode, ความยาว (เต็ม 1000), std ของ action noise</td></tr>
+</table>
+</section>
+
+</body>
+</html>

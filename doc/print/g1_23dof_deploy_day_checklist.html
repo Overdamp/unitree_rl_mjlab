@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>G1-23DoF Deploy Day Checklist</title>
+<style>
+  @page { size: A4; margin: 11mm 11mm 12mm 11mm; }
+  :root { --line: #999; --code-bg: #f2f2f2; --head-bg: #e6e6e6; --warn: #b00000; }
+  body { font-family: "Noto Sans Thai", "Noto Sans", sans-serif; font-size: 9.6pt; line-height: 1.32; color: #000; background: #fff; margin: 0; }
+  h1 { font-size: 15pt; margin: 0 0 2pt 0; }
+  .meta { font-size: 8.6pt; margin-bottom: 5pt; }
+  h2 { font-size: 11pt; background: var(--head-bg); padding: 2pt 5pt; margin: 7pt 0 3pt 0; break-after: avoid; }
+  section { break-inside: avoid; }
+  ul { list-style: none; padding-left: 0; margin: 2pt 0; }
+  li { margin: 1.5pt 0 1.5pt 0; padding-left: 15pt; text-indent: -15pt; }
+  li::before { content: "☐  "; font-size: 10.5pt; }
+  li.note::before { content: "•  "; }
+  pre { font-family: "DejaVu Sans Mono", monospace; font-size: 8.2pt; background: var(--code-bg); border: 1px solid #ccc; padding: 3pt 5pt; margin: 2pt 0 4pt 0; white-space: pre-wrap; word-break: break-all; }
+  code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.4pt; }
+  .term { font-weight: bold; }
+  table { border-collapse: collapse; width: 100%; font-size: 8.8pt; margin: 2pt 0 4pt 0; }
+  th, td { border: 1px solid var(--line); padding: 1.5pt 4pt; text-align: left; vertical-align: top; }
+  th { background: var(--head-bg); }
+  .stop { border: 2px solid var(--warn); padding: 4pt 6pt; margin: 6pt 0; break-inside: avoid; }
+  .stop b.t { color: var(--warn); }
+  .blank { display: inline-block; min-width: 38mm; border-bottom: 1px solid #000; }
+  .small { font-size: 8.4pt; }
+  .pb { break-before: page; }
+</style>
+</head>
+<body>
+
+<h1>G1-23DoF: ตรวจ kp/kd แล้ว deploy P3b (วันที่ 30/10/2026)</h1>
+<div class="meta">repo <code>~/nvidia/unitree/unitree_rl_mjlab</code> · branch <code>phase3-delay-dr</code> · policy <b>P3b</b> (<code>config/policy/velocity/v0</code>) ·
+รายละเอียดเต็ม: <code>doc/g1_23dof_real_robot_setup_checklist.md</code> หัวข้อ 9 · ผู้ทดสอบ <span class="blank"></span> คนกด LT+B <span class="blank"></span></div>
+
+<table>
+  <tr><th>Terminal</th><th>ใช้ทำอะไร</th><th>ตั้งค่าครั้งแรกในทุก terminal</th></tr>
+  <tr><td class="term">T1</td><td><code>lowstate_monitor</code> (อ่านอย่างเดียว)</td><td rowspan="4"><code>cd ~/nvidia/unitree/unitree_rl_mjlab</code><br><code>conda activate g1_sdk</code><br><code>unset CYCLONEDDS_URI</code><br><code>RUN=1</code> &nbsp;(รอบถัดไปใช้ 2, 3, ...)</td></tr>
+  <tr><td class="term">T2</td><td><code>lowcmd_monitor</code> (อ่านอย่างเดียว)</td></tr>
+  <tr><td class="term">T3</td><td><code>g1_ctrl</code> (ส่งคำสั่งมอเตอร์)</td></tr>
+  <tr><td class="term">T4</td><td>ตรวจก่อนเริ่ม, <code>motion_mode</code>, <code>pd_check</code></td></tr>
+</table>
+
+<section>
+<h2>0. ฮาร์ดแวร์และความปลอดภัย</h2>
+<ul>
+  <li>แขวนหุ่นบน gantry เท้าลอยประมาณ 5 cm, เชือกรับน้ำหนักได้, รัศมี 1 m ว่าง</li>
+  <li>แบต &gt; 50% (จดไว้: <span class="blank"></span> V) · สาย LAN จากหุ่นเข้า <code>enp43s0</code></li>
+  <li>คนกด LT + B ทำหน้าที่นี้อย่างเดียว · ตกลงคำว่า "หยุด" ไว้ก่อน · ตั้งกล้องอัดวิดีโอ</li>
+  <li>PC ว่าง: ไม่เทรน ไม่รัน docker หนัก · ปิด g1pilot <code>bringup</code>/<code>loco_client</code>, viewer และ RViz</li>
+</ul>
+</section>
+
+<section>
+<h2>1. เตรียม PC (T4)</h2>
+<ul>
+  <li>โค้ดล่าสุดและ build <code>g1_ctrl</code> (มี soft start)</li>
+</ul>
+<pre>git status --short          # ไม่ควรมีไฟล์ใน deploy/ ค้างแก้
+git log --oneline -1        # 8026177 หรือใหม่กว่า
+cd deploy/robots/g1_23dof/build &amp;&amp; make -j8 &amp;&amp; cd ~/nvidia/unitree/unitree_rl_mjlab</pre>
+<ul>
+  <li>เครือข่าย: ถ้าขึ้น <code>File exists</code> ตอน add IP แปลว่ามีอยู่แล้ว ใช้ต่อได้</li>
+</ul>
+<pre>sudo ip addr add 192.168.123.123/24 dev enp43s0
+sudo ip link set enp43s0 up
+ip -br addr show enp43s0                 # ต้องเห็น 192.168.123.123/24
+ip link show enp43s0 | grep -o MULTICAST # ต้องเห็น MULTICAST
+ping -c 5 192.168.123.161                # 0% packet loss</pre>
+<ul>
+  <li>ตรวจ policy ก่อนใช้</li>
+</ul>
+<pre>P=deploy/robots/g1_23dof/config/policy/velocity/v0
+md5sum $P/exported/policy.onnx        # 727da8a2bc5293f617a8e06f8c13a07e
+grep -n "policy_dir: config/policy/velocity" deploy/robots/g1_23dof/config/config.yaml   # ต้องเป็น .../v0
+python deploy/robots/g1_23dof/scripts/gain_check.py $P   # PASS</pre>
+</section>
+
+<section>
+<h2>2. ปิด controller ในตัวหุ่น (เข้า debug mode)</h2>
+<ul>
+  <li>เปิดหุ่น รอจนเข้า zero-torque หรือ damping ระหว่างนี้ T4 รัน: <code>python deploy/robots/g1_23dof/scripts/motion_mode.py check</code> แล้วจดชื่อโหมด: <span class="blank"></span></li>
+  <li>รีโมต: <b>L2 + B</b> (Damping) แล้ว <b>L2 + R2</b> (debug mode)</li>
+  <li>T4 รัน <code>motion_mode.py check</code> อีกครั้ง → <code>name=''</code> (released / debug)</li>
+</ul>
+</section>
+
+<section>
+<h2>3. เปิดบันทึกและ controller</h2>
+<pre><span class="term">T1:</span> python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --iface enp43s0 \
+      --log ~/g1_state_20261030_run$RUN.csv
+<span class="term">T2:</span> python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py --iface enp43s0 \
+      --log ~/g1_cmd_20261030_run$RUN.csv
+<span class="term">T3:</span> cd deploy/robots/g1_23dof/build
+    env -u CYCLONEDDS_URI LD_LIBRARY_PATH=/opt/unitree_robotics/lib ./g1_ctrl --network enp43s0</pre>
+<ul>
+  <li>T1: ประมาณ 1000 Hz, <code>mode_machine 4</code>, ไม่มี <code>STALE</code></li>
+  <li>T3: <code>Connected to robot</code> · <code>LowState timeout set to 100 ms</code> · <code>Policy directory: .../velocity/v0</code> · <code>ONNX policy loaded</code></li>
+  <li>T3 <b>ต้องไม่มี</b> <code>Unmatched robot type</code> และ <code>The other process is using the lowcmd channel</code> (ถ้ามีให้หยุด)</li>
+</ul>
+</section>
+
+<section>
+<h2>4. Passive (kp = 0): ตรวจ kd · เวลาเริ่ม <span class="blank" style="min-width:20mm"></span></h2>
+<ul>
+  <li>T2 = <code>gains match: Passive</code> (kp = 0 ทุก slot, kd 2.5–6)</li>
+  <li>หมุนด้วยมือ ทีละ joint ช้า 2–3 รอบแล้วเร็ว 2–3 รอบ: ขาซ้าย → ขาขวา → waist yaw → แขนซ้าย → แขนขวา</li>
+  <li>หนืดขึ้นเมื่อหมุนเร็ว ไม่ดีดกลับที่เดิม ไม่กระตุก</li>
+</ul>
+</section>
+
+<section>
+<h2>5. FixStand (gain ของ Unitree): ตรวจ kp · เวลาเริ่ม <span class="blank" style="min-width:20mm"></span></h2>
+<ul>
+  <li>รีโมต <b>LT + ↑</b>: ทุก joint เข้าท่ายืนใน 3 s ไม่มีตัวไหนไปผิดทิศ (ถ้าผิดกด <b>LT + B</b> ทันที)</li>
+  <li>T2 = <code>gains match: FixStand</code> และไม่มี <code>MISMATCH</code></li>
+  <li>ค้างนิ่ง 30 s: ห่างจาก <code>qs</code> &lt; 0.05 rad, ไม่สั่น (<b>ดูแขน</b>), อุณหภูมิขึ้นไม่เกิน 5 °C (T1)</li>
+  <li>ดันออก 0.1–0.2 rad ค้าง 1 s แล้วปล่อย ทีละกลุ่ม (เน้น hip yaw, waist yaw, wrist roll): ต้องกลับเข้าท่านุ่มๆ ไม่แกว่ง</li>
+  <li>(ไม่บังคับ) กด Ctrl-C ที่ T3 ระหว่างค้างท่า แล้วจดอาการมอเตอร์: <span class="blank"></span> → รัน T3 ใหม่</li>
+  <li>รีโมต <b>LT + B</b> → Passive · หยุด T1 และ T2 ด้วย Ctrl-C (ไฟล์ CSV ถูกบันทึกแล้ว)</li>
+</ul>
+</section>
+
+<section>
+<h2>6. วิเคราะห์ kp/kd (T4)</h2>
+<pre>python deploy/robots/g1_23dof/scripts/pd_check.py \
+      ~/g1_state_20261030_run$RUN.csv ~/g1_cmd_20261030_run$RUN.csv</pre>
+<table>
+  <tr><th>ช่วง</th><th>ผ่านเมื่อ</th><th>ผลที่ได้</th></tr>
+  <tr><td>Passive</td><td><code>kd x</code> 0.5–1.5 (joint ที่หมุนเร็วพอ)</td><td></td></tr>
+  <tr><td>FixStand</td><td><code>kp x</code> 0.8–1.2, corr ≥ 0.9 ทุก joint ที่ถูกให้คะแนน</td><td></td></tr>
+  <tr><td>delay ที่ fit ได้</td><td>≤ 10 ms</td><td>____ ms</td></tr>
+</table>
+<ul>
+  <li class="note">joint ขึ้น <code>not scored</code> → ทำรอบใหม่ (<code>RUN=2</code> ในทุก terminal) ดันเฉพาะ joint นั้นให้แรงขึ้น</li>
+  <li class="note">ทุก joint เพี้ยนไปทางเดียวกันแต่ยืนนิ่งดี → น่าจะเป็นเพราะ <code>tau_est</code> คลาด ไปต่อได้ · <code>SIGN</code> หรือมีแค่บาง joint ผิด → <b>หยุด ไม่ deploy</b></li>
+</ul>
+</section>
+
+<section>
+<h2>7. Deploy P3b บนพื้น (ทำเมื่อข้อ 6 ผ่านเท่านั้น)</h2>
+<pre><span class="term">T1:</span> python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --iface enp43s0 \
+      --log ~/g1_state_20261030_walk$RUN.csv
+<span class="term">T2:</span> python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py --iface enp43s0 \
+      --log ~/g1_cmd_20261030_walk$RUN.csv
+<span class="term">T3:</span> (ถ้าปิดไปแล้ว) env -u CYCLONEDDS_URI LD_LIBRARY_PATH=/opt/unitree_robotics/lib \
+      ./g1_ctrl --network enp43s0</pre>
+<ul>
+  <li><b>LT + ↑</b> FixStand ตอนยังแขวน → หย่อนจนเท้าแตะพื้นเต็มเท้า เชือกหย่อนพอให้หุ่นรับน้ำหนักเอง แต่ยังกันล้มได้</li>
+  <li><b>RT + A</b> → Velocity (soft start 0.5 s): T2 = <code>gains match: Velocity</code> · slot 13/14/20/21/27/28 ได้ kp = 0 · ไม่มี <code>MISMATCH</code></li>
+  <li>ยืนเฉยๆ 30 s: นิ่ง ไม่ย่ำ เอียง &lt; 5° (T1)</li>
+  <li>stick ซ้ายดันไปหน้า ~20% (≈ 0.2 m/s) 3–5 s แล้วปล่อย → ถ้าผ่านเพิ่มเป็น ~40% (≈ 0.4 m/s) สั้นๆ (P3b เลี้ยวขวาเอง ~2°/s แก้ด้วย stick ขวา)</li>
+  <li>ถอยหลัง ~20% · หมุนด้วย stick ขวา ~30% ทั้งสองทิศ · เดินด้านข้างด้วย stick ซ้ายแกนนอน ~30%</li>
+  <li>จบ: ให้เชือกรับน้ำหนักก่อน แล้วค่อยกด <b>LT + B</b> (Passive = kp 0 หุ่นจะทรุด)</li>
+</ul>
+<table class="small">
+  <tr><th>stick</th><th>คำสั่ง</th><th>ดันสุด</th><th>รอบนี้ดันไม่เกิน</th></tr>
+  <tr><td>ซ้าย แกนตั้ง</td><td>vx</td><td>1.0 m/s (clamp −0.5 ถึง 1.0)</td><td>~40% (0.4 m/s)</td></tr>
+  <tr><td>ซ้าย แกนนอน</td><td>vy</td><td>±0.5 m/s</td><td>~30%</td></tr>
+  <tr><td>ขวา แกนนอน</td><td>wz</td><td>±1.0 rad/s</td><td>~30%</td></tr>
+</table>
+<p class="small">จอยรีโมตส่งค่าตรงไม่มีการ smooth ให้ดันช้าๆ · ห้ามกด RT + A ตอนหุ่นยังแขวน</p>
+</section>
+
+<div class="stop">
+<b class="t">หยุดทันที (LT + B)</b> เมื่อ joint ไปผิดทิศ / สั่นถี่ / มีเสียงเกียร์ผิดปกติ · T2 ขึ้น <code>MISMATCH</code> หรือ <code>unknown</code> · T1 ขึ้น <code>STALE</code> / gap &gt; 100 ms / <code>OUT</code> · อุณหภูมิมอเตอร์ &gt; 70 °C · ลำตัวเอียง &gt; 15° · มีคนพูด "หยุด"<br>
+ระบบตัดเองเมื่อ: LowState ขาด 100 ms หรือเอียง &gt; 49° (ช้าเกินกว่าจะกันล้ม ห้ามรอให้ระบบตัดเอง)
+</div>
+
+<section>
+<h2>8. จบวัน</h2>
+<ul>
+  <li>Passive (LT + B) ตอนหุ่นแขวน → Ctrl-C ที่ T3, T1 และ T2</li>
+  <li>กลับโหมดรีโมต (เลือกอย่างใดอย่างหนึ่ง):</li>
+</ul>
+<pre><span class="term">T4:</span> python deploy/robots/g1_23dof/scripts/motion_mode.py select &lt;ชื่อที่จดไว้ในข้อ 2&gt;
+     #   จะปฏิเสธถ้ายังมี rt/lowcmd (g1_ctrl ยังไม่ปิด)
+     python deploy/robots/g1_23dof/scripts/motion_mode.py check   # name ต้องไม่ว่าง
+หรือ: ปิดเครื่องหุ่นแล้วเปิดใหม่</pre>
+<ul>
+  <li>เก็บไฟล์: <code>ls -lh ~/g1_state_20261030_* ~/g1_cmd_20261030_*</code> · วิดีโอ · ผล <code>pd_check</code> · แบตตอนจบ <span class="blank"></span> V</li>
+  <li>(ถ้ามีข้อมูลช่วง Velocity) <code>pd_check.py</code> กับไฟล์ <code>~/g1_state_20261030_walk$RUN.csv</code> และ <code>~/g1_cmd_20261030_walk$RUN.csv</code></li>
+</ul>
+</section>
+
+<section>
+<h2>บันทึกหน้างาน</h2>
+<table>
+  <tr><th style="width:18%">ขั้น</th><th style="width:12%">เวลา</th><th>ผล / อาการ / อุณหภูมิสูงสุด</th></tr>
+  <tr><td>Passive</td><td></td><td>&nbsp;</td></tr>
+  <tr><td>FixStand</td><td></td><td>&nbsp;</td></tr>
+  <tr><td>pd_check</td><td></td><td>&nbsp;</td></tr>
+  <tr><td>ยืนบนพื้น</td><td></td><td>&nbsp;</td></tr>
+  <tr><td>เดิน / หมุน</td><td></td><td>&nbsp;</td></tr>
+  <tr><td>อื่นๆ</td><td></td><td>&nbsp;<br>&nbsp;</td></tr>
+</table>
+</section>
+
+</body>
+</html>
