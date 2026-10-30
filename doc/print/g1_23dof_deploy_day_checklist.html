@@ -81,9 +81,13 @@ python deploy/robots/g1_23dof/scripts/gain_check.py $P   # PASS</pre>
 <h2>2. ปิด controller ในตัวหุ่น (เข้า debug mode)</h2>
 <ul>
   <li>เปิดหุ่น รอจนเข้า zero-torque หรือ damping ระหว่างนี้ T4 รัน: <code>python deploy/robots/g1_23dof/scripts/motion_mode.py check</code> แล้วจดชื่อโหมด: <span class="blank"></span></li>
-  <li>รีโมต: <b>L2 + B</b> (Damping) แล้ว <b>L2 + R2</b> (debug mode)</li>
+  <li>รีโมต (หุ่น<b>แขวนอยู่</b> ห้ามทำตอนนั่ง/นอน): <b>L2 + B</b> (Damping) แล้ว <b>L2 + R2</b> (debug mode)</li>
   <li>T4 รัน <code>motion_mode.py check</code> อีกครั้ง → <code>name=''</code> (released / debug)</li>
+  <li>T1 ทุก slot ที่ใช้ต้องมีอุณหภูมิและแรงดัน ≈ 52 V (ถ้า slot ไหน 0 V หรือ T = 0 → หยุด มอเตอร์หลุด)</li>
 </ul>
+<div class="stop"><b class="t">ข้าม L2 + A:</b> Unitree ใช้ L2 + A ยืนยัน debug แต่หุ่นจะเหยียดตัวตรง ·
+30/10/2026 กดตอนหุ่นนั่ง แล้วมอเตอร์ศอกขวา (25) และข้อมือขวา (26) หลุด รีบูตไม่หาย · ยืนยันด้วย <code>motion_mode.py check</code> แทน ·
+ถ้าจะกดต้องแขวนอยู่และรอบตัวว่าง · L2 + B = หยุดฉุกเฉินได้แม้ใน debug</div>
 </section>
 
 <section>

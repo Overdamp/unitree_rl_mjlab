@@ -58,22 +58,24 @@ SATURATION_FRAC = 0.95  # of the MJCF effort limit
 def read_csv(path: Path, keys: list[str], decimate: int = 1) -> dict[str, np.ndarray]:
   """Columns named in keys ('t', 'q' -> q0..q28, ...) as arrays."""
   with open(path, newline="") as f:
-    reader = csv.reader(f)
-    header = next(reader)
-    col = {n: i for i, n in enumerate(header)}
-    idx = {}
-    for k in keys:
-      if k in col:
-        idx[k] = [col[k]]
-      elif f"{k}0" in col:
-        idx[k] = [col[f"{k}{i}"] for i in range(NUM_SLOTS)]
-      else:
-        raise SystemExit(f"{path.name}: no column '{k}' (old log without it?)")
-    rows = [row for n, row in enumerate(reader) if n % decimate == 0 and len(row) == len(header)]
-  out = {}
+    header = next(csv.reader(f))
+  col = {n: i for i, n in enumerate(header)}
+  idx = {}
+  for k in keys:
+    if k in col:
+      idx[k] = [col[k]]
+    elif f"{k}0" in col:
+      idx[k] = [col[f"{k}{i}"] for i in range(NUM_SLOTS)]
+    else:
+      raise SystemExit(f"{path.name}: no column '{k}' (old log without it?)")
+  # loadtxt keeps only the needed columns as floats, so multi-GB logs fit in memory.
+  usecols = [c for cols in idx.values() for c in cols]
+  data = np.loadtxt(path, delimiter=",", skiprows=1, usecols=usecols, ndmin=2)[::decimate]
+  out, start = {}, 0
   for k, cols in idx.items():
-    a = np.array([[float(r[c]) for c in cols] for r in rows])
-    out[k] = a[:, 0] if len(cols) == 1 else a
+    a = data[:, start:start + len(cols)]
+    out[k] = a[:, 0].copy() if len(cols) == 1 else a
+    start += len(cols)
   return out
 
 

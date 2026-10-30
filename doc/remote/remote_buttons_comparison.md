@@ -51,6 +51,22 @@
 
 ทุกเวอร์ชันตั้งแต่ B: อยู่ในโหมดเดินแล้วกด ① ค้าง 5 วินาที → เข้า damping protection
 
+**ปุ่มในตารางนี้ใช้กับโหมดปกติเท่านั้น** หลังเข้า debug mode (L2 + R2) ความหมายเปลี่ยน โดยเฉพาะ **L2 + A = ยืนยัน debug และหุ่นเหยียดตัวตรง** ดูหัวข้อ 8
+
+## สีไฟ LED (G1)
+
+จาก [G1 remote control](https://support.unitree.com/home/en/G1_developer/remote_control) ของ Unitree:
+
+| สี (ติดค้าง) | สถานะ |
+|---|---|
+| ฟ้า (Blue) | ทำงานปกติ (Normal Operation) |
+| น้ำเงินเข้ม (Dark Blue) | Standby |
+| ส้ม (Orange) | Damping |
+| เขียว (Green) | นั่ง (Seated) |
+| **เหลือง (Yellow)** | **Debug mode** |
+| ม่วง (Purple) | Zero Torque |
+| **แดง (Red)** | **Error** |
+
 ## 2. สลับการเดิน (Motion Control Switching)
 
 | โหมด | A (< 8.2) | B (≥ 8.2) | C (≥ 8.4.2.222, 23dof) | D (23dof key desc.) | E (Combat) |
@@ -162,4 +178,6 @@
 
 - `g1_ctrl` เลือกปุ่มให้ตรงกับความหมายของ firmware ≥ 8.2 คนที่เคยใช้รีโมตจึงจำง่าย แต่ **ถ้าหุ่นเป็น firmware < 8.2 (A) ปุ่ม L2 + B ใน firmware เดิมไม่ใช่ Damping** ตอนอยู่ใน debug mode ไม่มีปัญหา เพราะ `g1_ctrl` เป็นคนอ่านปุ่ม
 - `g1_ctrl` ไม่มีโหมดอื่น (นั่ง, เต้น, ต่อสู้) ปุ่มอื่นใช้ไม่ได้ระหว่างรัน `g1_ctrl`
+- **L2 + A ใน debug mode** ไม่ใช่ ⑥ Squat ↔ Stand เอกสาร Unitree ([G1 remote control](https://support.unitree.com/home/en/G1_developer/remote_control)) ให้กด L2 + A เพื่อยืนยันว่าเข้า debug แล้ว หุ่นจะเหยียดตัวตรง เหตุการณ์ 30/10/2026: เปิดหุ่นตอนนั่ง → L2 + R2 → L2 + A แล้วมอเตอร์ right elbow (25) และ right wrist roll (26) หลุด (`vol` 0, `motorstate` 0x80000000) รีบูตไม่หาย ยังไม่รู้ว่าเป็นสาเหตุหรือไม่ เราจึงข้ามปุ่มนี้แล้วยืนยันด้วย `motion_mode.py check` แทน
+- เข้า debug mode **ตอนหุ่นแขวนเท่านั้น** (Unitree รองรับเฉพาะตอน zero torque หรือ damping): L2 + B (Damping) → L2 + R2 แล้วเปิด `g1_ctrl` · L2 + B เป็นปุ่มหยุดฉุกเฉินได้แม้ใน debug
 - ห้ามออกจาก debug mode ขณะ `g1_ctrl` ยังรันอยู่ controller ในตัวน่าจะกลับมาทำงานและสั่งมอเตอร์แย่งกับ `g1_ctrl` (ยังไม่ได้ทดสอบ)

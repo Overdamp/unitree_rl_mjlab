@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><title>G1 Remote Buttons</title><style>
+@page { size: A4 landscape; margin: 9mm 10mm 10mm 10mm; }
+body { font-family: "Noto Sans Thai", "Noto Sans", sans-serif; font-size: 8.6pt; line-height: 1.28; color: #000; background: #fff; margin: 0; }
+h1 { font-size: 14pt; margin: 0 0 3pt 0; }
+h2 { font-size: 10.5pt; background: #e3e3e3; padding: 2pt 5pt; margin: 8pt 0 3pt 0; break-after: avoid; }
+p, ul { margin: 2pt 0 4pt 0; } ul { padding-left: 16pt; }
+table { border-collapse: collapse; width: 100%; margin: 1pt 0 4pt 0; }
+tr { break-inside: avoid; }
+th, td { border: 1px solid #999; padding: 1.4pt 4pt; text-align: left; vertical-align: top; }
+th { background: #efefef; }
+code { font-family: "DejaVu Sans Mono", monospace; font-size: 7.8pt; }
+</style></head>
+<body>
+<h1>เปรียบเทียบปุ่มรีโมต Unitree G1 แต่ละเวอร์ชัน</h1>
+<p>สรุปจาก PDF ในโฟลเดอร์นี้ (อ่านปุ่มจากรูปในหน้าภาษาอังกฤษ, 30/10/2026) ปุ่มทิศ (D-pad) อ่านจากไอคอน ถ้าจะใช้งานจริงให้ดู PDF ประกอบ</p>
+<h2>ไฟล์และเวอร์ชัน</h2>
+<table>
+<thead>
+<tr>
+<th>ย่อ</th>
+<th>ไฟล์</th>
+<th>เวอร์ชัน / หุ่น</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A</strong></td>
+<td><code>Motion Control Version &lt; 8.2.0.0.pdf</code></td>
+<td>firmware เก่ากว่า 8.2.0.0 (ปุ่มหลักคือ L1)</td>
+</tr>
+<tr>
+<td><strong>B</strong></td>
+<td><code>Motion Control Version &gt;= 8.2.0.0.pdf</code></td>
+<td>≥ 8.2.0.0 (ปุ่มหลักเปลี่ยนเป็น L2), แยกเอว 1-DoF / 3-DoF</td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td><code>Motion Control Version &gt;= 8.4.2.222，G1 23-Dof .pdf</code></td>
+<td>≥ 8.4.2.222 สำหรับ G1 23-DoF</td>
+</tr>
+<tr>
+<td><strong>D</strong></td>
+<td><code>23dofRemote control key description.pdf</code></td>
+<td>G1 23-DoF รุ่นที่มีท่าเต้น, ลุกขึ้นเอง และโหมดเสียง (ไม่ระบุเลขเวอร์ชัน)</td>
+</tr>
+<tr>
+<td><strong>E</strong></td>
+<td><code>Combat Version.pdf</code> = <code>Boxing Controller.pdf</code></td>
+<td>เวอร์ชันต่อสู้ (สองไฟล์เป็นไฟล์เดียวกัน md5 <code>192152a4…</code>)</td>
+</tr>
+</tbody>
+</table>
+<h2>สัญลักษณ์</h2>
+<table>
+<thead>
+<tr>
+<th>สัญลักษณ์</th>
+<th>ความหมาย</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>★</td>
+<td>กดสั้นครั้งเดียว</td>
+</tr>
+<tr>
+<td>▲</td>
+<td>กดค้าง 2 วินาที</td>
+</tr>
+<tr>
+<td><code>X + Y</code></td>
+<td>กด X ค้างไว้แล้วกด Y</td>
+</tr>
+<tr>
+<td>↑ ↓ ← →</td>
+<td>ปุ่มทิศ (D-pad)</td>
+</tr>
+<tr>
+<td>—</td>
+<td>ไม่มีในเวอร์ชันนั้น</td>
+</tr>
+</tbody>
+</table>
+<p>ไฟล์ A ไม่มีสัญลักษณ์ ★ / ▲</p>
+<h2>1. สลับโหมด (Mode)</h2>
+<table>
+<thead>
+<tr>
+<th>โหมด</th>
+<th>A (&lt; 8.2)</th>
+<th>B (≥ 8.2)</th>
+<th>C (≥ 8.4.2.222, 23dof)</th>
+<th>D (23dof key desc.)</th>
+<th>E (Combat)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Zero Moment (ปล่อยแรงบิด)</td>
+<td>L1 + B</td>
+<td>L2 + Y ★</td>
+<td>L2 + Y ★</td>
+<td>L2 + Y ★</td>
+<td>L2 + Y ★</td>
+</tr>
+<tr>
+<td>① Damping (หน่วง)</td>
+<td>L1 + A</td>
+<td>L2 + B ★</td>
+<td>L2 + B ★</td>
+<td>L2 + B ★</td>
+<td>L2 + B ★</td>
+</tr>
+<tr>
+<td>② Locked Standing (ล็อกยืน)</td>
+<td>L1 + ↑</td>
+<td>L2 + ↑ ★</td>
+<td>L2 + ↑ ★</td>
+<td>L2 + ↑ ★</td>
+<td>L2 + ↑ ★</td>
+</tr>
+<tr>
+<td>④ Seated Mode (นั่ง)</td>
+<td>L1 + ←</td>
+<td>L2 + ← ▲</td>
+<td>L2 + ← ▲</td>
+<td>L2 + ← ▲</td>
+<td>L2 + ← ▲</td>
+</tr>
+<tr>
+<td>⑤ Lie → Stand (นอน → ยืน)</td>
+<td>L1 + X</td>
+<td>L2 + X ★</td>
+<td>L2 + X ★</td>
+<td>L2 + X ★</td>
+<td>L2 + X ★</td>
+</tr>
+<tr>
+<td>⑥ Squat ↔ Stand (ย่อ ↔ ยืน)</td>
+<td>L1 + Y</td>
+<td>L2 + A ▲</td>
+<td>L2 + A ▲</td>
+<td>L2 + A ▲</td>
+<td>L2 + A ▲</td>
+</tr>
+<tr>
+<td>⑩ Adapt Rise (ลุกขึ้นเอง)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>R1 + R2 + X ★</td>
+<td>R1 + R2 + X ★</td>
+</tr>
+</tbody>
+</table>
+<p>ทุกเวอร์ชันตั้งแต่ B: อยู่ในโหมดเดินแล้วกด ① ค้าง 5 วินาที → เข้า damping protection</p>
+<p><strong>ปุ่มในตารางนี้ใช้กับโหมดปกติเท่านั้น</strong> หลังเข้า debug mode (L2 + R2) ความหมายเปลี่ยน โดยเฉพาะ <strong>L2 + A = ยืนยัน debug และหุ่นเหยียดตัวตรง</strong> ดูหัวข้อ 8</p>
+<h2>สีไฟ LED (G1)</h2>
+<p>จาก <a href="https://support.unitree.com/home/en/G1_developer/remote_control">G1 remote control</a> ของ Unitree:</p>
+<table>
+<thead>
+<tr>
+<th>สี (ติดค้าง)</th>
+<th>สถานะ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ฟ้า (Blue)</td>
+<td>ทำงานปกติ (Normal Operation)</td>
+</tr>
+<tr>
+<td>น้ำเงินเข้ม (Dark Blue)</td>
+<td>Standby</td>
+</tr>
+<tr>
+<td>ส้ม (Orange)</td>
+<td>Damping</td>
+</tr>
+<tr>
+<td>เขียว (Green)</td>
+<td>นั่ง (Seated)</td>
+</tr>
+<tr>
+<td><strong>เหลือง (Yellow)</strong></td>
+<td><strong>Debug mode</strong></td>
+</tr>
+<tr>
+<td>ม่วง (Purple)</td>
+<td>Zero Torque</td>
+</tr>
+<tr>
+<td><strong>แดง (Red)</strong></td>
+<td><strong>Error</strong></td>
+</tr>
+</tbody>
+</table>
+<h2>2. สลับการเดิน (Motion Control Switching)</h2>
+<table>
+<thead>
+<tr>
+<th>โหมด</th>
+<th>A (&lt; 8.2)</th>
+<th>B (≥ 8.2)</th>
+<th>C (≥ 8.4.2.222, 23dof)</th>
+<th>D (23dof key desc.)</th>
+<th>E (Combat)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>③ Running / เอว 1-DoF</td>
+<td>R1 + X (1-DoF Waist)</td>
+<td>R2 + A ▲ (Running)</td>
+<td>R2 + A ▲</td>
+<td>R2 + A ▲</td>
+<td>R2 + A ▲</td>
+</tr>
+<tr>
+<td>└ Low / High Speed (Running)</td>
+<td>ดับเบิลคลิก L2 / L1</td>
+<td>R2 + ↓ / ↑ ★</td>
+<td>R2 + ↓ / ↑ ★</td>
+<td>R2 + ↓ / ↑ ★</td>
+<td>—</td>
+</tr>
+<tr>
+<td>เอว 3-DoF</td>
+<td>R1 + Y</td>
+<td>(ใน Regular)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Regular Mode (เดินปกติ)</td>
+<td>—</td>
+<td>R1 + X (1-DoF) / R1 + Y (3-DoF) ▲</td>
+<td>R1 + X ▲</td>
+<td>R1 + X ▲</td>
+<td><strong>R1 + Y ▲</strong> (⑦)</td>
+</tr>
+<tr>
+<td>└ Low / High Speed (Regular)</td>
+<td>—</td>
+<td>ดับเบิลคลิก L2 / L1 ★</td>
+<td>ดับเบิลคลิก L2 / L1 ★</td>
+<td>ดับเบิลคลิก L2 / L1 ★</td>
+<td>ดับเบิลคลิก L2 / L1 ★</td>
+</tr>
+<tr>
+<td>Keep Stepping (ย่ำเท้า)</td>
+<td>ดับเบิลคลิก START</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Standing (หยุดย่ำ)</td>
+<td>คลิก START</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>⑧ Climb Mode (ข้ามสิ่งกีดขวาง)</td>
+<td>—</td>
+<td>—</td>
+<td>R2 + B ▲</td>
+<td>R2 + B ▲</td>
+<td>—</td>
+</tr>
+<tr>
+<td>└ Stepping / Standing</td>
+<td>—</td>
+<td>—</td>
+<td>ดับเบิลคลิก START ★</td>
+<td>ดับเบิลคลิก START ★</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Switch to Voice Mode: Normal / Welcome</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>R1 + R2 + Y ★</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Running: เชียร์มือซ้าย / ขวา / สองมือ / ปล่อยมือ</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>ดับเบิลคลิก ← / → / ↑ / ↓ ★</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>A ใช้ R1 + X / R1 + Y เลือกเอว 1-DoF / 3-DoF แล้วเปลี่ยนความเร็วด้วยดับเบิลคลิก L2 (ต่ำ) / L1 (สูง)</li>
+<li>ตั้งแต่ B ปุ่ม R2 + A เข้าโหมด Running และ R1 + X/Y เข้า Regular</li>
+<li>ใน E ปุ่ม Regular เปลี่ยนเป็น <strong>R1 + Y</strong> (ใน B–D คือ R1 + X)</li>
+</ul>
+<h2>3. ท่าทางโต้ตอบ (Interactional)</h2>
+<table>
+<thead>
+<tr>
+<th>ท่า</th>
+<th>A</th>
+<th>B</th>
+<th>C</th>
+<th>D</th>
+<th>E</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Handshake (จับมือ)</td>
+<td>SELECT + A</td>
+<td>SELECT + A ★</td>
+<td>SELECT + A ★</td>
+<td>SELECT + A ★</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Wave Hand (โบกมือ)</td>
+<td>SELECT + Y</td>
+<td>SELECT + Y ★</td>
+<td>SELECT + Y ★</td>
+<td>SELECT + Y ★</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Turn Around and Wave Hand</td>
+<td>SELECT + X</td>
+<td>SELECT + X ★</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Reject (ไขว้มือเป็น X)</td>
+<td>—</td>
+<td>—</td>
+<td>SELECT + X ★</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Face Wave (โบกมือหน้าอก)</td>
+<td>—</td>
+<td>—</td>
+<td>ดับเบิลคลิก Y ★</td>
+<td>ดับเบิลคลิก Y ★</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Right Kiss (ส่งจูบ)</td>
+<td>—</td>
+<td>—</td>
+<td>ดับเบิลคลิก X ★</td>
+<td>ดับเบิลคลิก X ★</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Clap (ปรบมือ)</td>
+<td>—</td>
+<td>—</td>
+<td>ดับเบิลคลิก A ★</td>
+<td>ดับเบิลคลิก A ★</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Right Raise (ยกมือขวา)</td>
+<td>—</td>
+<td>—</td>
+<td>ดับเบิลคลิก B ★</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2>4. ท่าเต้น (เฉพาะ 23dof key description)</h2>
+<table>
+<thead>
+<tr>
+<th>ท่า</th>
+<th>ปุ่ม (D)</th>
+<th>พื้นที่ที่ต้องใช้</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>⑨ เข้า Dance Mode</td>
+<td>R1 + B</td>
+<td></td>
+</tr>
+<tr>
+<td>Charleston dance 1</td>
+<td>R1 + ↑ ★</td>
+<td>→ 1 m</td>
+</tr>
+<tr>
+<td>Charleston dance 2</td>
+<td>R1 + ← ★</td>
+<td>↑ 1 m, ← 1 m</td>
+</tr>
+<tr>
+<td>Charleston dance 3</td>
+<td>R1 + → ★</td>
+<td>↗ 3 m</td>
+</tr>
+<tr>
+<td>Jeet Kune Do</td>
+<td>R2 + ↑ ★</td>
+<td>3 m × 3 m</td>
+</tr>
+<tr>
+<td>Twist</td>
+<td>R2 + ← ★</td>
+<td>3 m × 3 m</td>
+</tr>
+</tbody>
+</table>
+<p>ระหว่างเต้นหรือทำท่าแขน ดับเบิลคลิก START = หยุดฉุกเฉิน</p>
+<h2>5. โหมดต่อสู้ (เฉพาะ Combat / Boxing)</h2>
+<p>เข้า ⑧ Boxing ด้วย <strong>R1 + A ▲</strong> ทุกท่ากดสั้น ★</p>
+<table>
+<thead>
+<tr>
+<th>หมวด</th>
+<th>ท่า</th>
+<th>ปุ่ม</th>
+<th>หมวด</th>
+<th>ท่า</th>
+<th>ปุ่ม</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Upper Body</td>
+<td>Straight Punch</td>
+<td>R1 + ↑</td>
+<td>Legs</td>
+<td>Front Kick</td>
+<td>R2 + ↑</td>
+</tr>
+<tr>
+<td></td>
+<td>Left Hook</td>
+<td>R1 + ←</td>
+<td></td>
+<td>Left Side Kick</td>
+<td>R2 + ←</td>
+</tr>
+<tr>
+<td></td>
+<td>Right Hook</td>
+<td>R1 + →</td>
+<td></td>
+<td>Right Side Kick</td>
+<td>R2 + →</td>
+</tr>
+<tr>
+<td></td>
+<td>Uppercut</td>
+<td>R1 + ↓</td>
+<td></td>
+<td>Knee Kick</td>
+<td>R2 + ↓</td>
+</tr>
+<tr>
+<td>Evasion</td>
+<td>Turn Around 180°</td>
+<td>ดับเบิลคลิก ↑</td>
+<td>Taunt</td>
+<td>Ready Stance</td>
+<td>ดับเบิลคลิก Y</td>
+</tr>
+<tr>
+<td></td>
+<td>Left Dodge</td>
+<td>ดับเบิลคลิก ←</td>
+<td></td>
+<td>Block</td>
+<td>ดับเบิลคลิก X</td>
+</tr>
+<tr>
+<td></td>
+<td>Right Dodge</td>
+<td>ดับเบิลคลิก →</td>
+<td></td>
+<td>Bring it on</td>
+<td>ดับเบิลคลิก B</td>
+</tr>
+<tr>
+<td></td>
+<td>Back Dodge</td>
+<td>ดับเบิลคลิก ↓</td>
+<td></td>
+<td>Slap Own Butt</td>
+<td>ดับเบิลคลิก A</td>
+</tr>
+<tr>
+<td>Stance</td>
+<td>Lying → Standing</td>
+<td>L2 + ↑</td>
+<td>Stance</td>
+<td>Standing → Lying</td>
+<td>L2 + ↓</td>
+</tr>
+<tr>
+<td>Combo</td>
+<td>Combo 1 / 2 / 3 / 4</td>
+<td>L1 + ↑ / ← / → / ↓</td>
+<td>Combo</td>
+<td>Combo Punch / Ram</td>
+<td>R1 + SELECT / R2 + SELECT</td>
+</tr>
+</tbody>
+</table>
+<h2>6. ลำดับเปิด-ปิดเครื่อง</h2>
+<table>
+<thead>
+<tr>
+<th>วิธี</th>
+<th>A</th>
+<th>B, C</th>
+<th>D</th>
+<th>E</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>เปิดตอนนอน</td>
+<td>① → ⑤ → Show → ⑥ → ปิด</td>
+<td>① → ⑤ → Demo → ⑥ → ปิด</td>
+<td>① → <strong>⑩</strong> → Demo → ⑥ → ปิด</td>
+<td>① → <strong>⑩</strong> → Demo → ⑥ → ปิด</td>
+</tr>
+<tr>
+<td>เปิดตอนย่อ</td>
+<td>① → ⑥ → Show → ⑥ → ปิด</td>
+<td>① → ⑥ → Demo → ⑥ → ปิด</td>
+<td>เหมือน B</td>
+<td>เหมือน B</td>
+</tr>
+<tr>
+<td>เปิดตอนนั่ง (แนะนำ)</td>
+<td>① → ② → ③ → Show → ④ → ปิด</td>
+<td>เหมือน A</td>
+<td>เหมือน A</td>
+<td>เหมือน A</td>
+</tr>
+<tr>
+<td>เปิดแบบต่อสู้</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>① → ② → ⑧ → ② → Demo → ปิด</td>
+</tr>
+</tbody>
+</table>
+<p>ทุกเวอร์ชัน: ช่วง ② → ③ ตอนเปิดแบบนั่ง ต้องมีคนประคองให้หุ่นยืนตรง</p>
+<h2>7. สรุปความเหมือนและความต่าง</h2>
+<p><strong>เหมือนกันทุกเวอร์ชันตั้งแต่ B (≥ 8.2):</strong></p>
+<ul>
+<li>ปุ่มสลับโหมดชุดเดียวกัน: L2 + Y / B / ↑ / ← / X / A = Zero Moment / Damping / Locked Standing / Seated / Lie → Stand / Squat ↔ Stand</li>
+<li>R2 + A ▲ = Running Mode</li>
+<li>ดับเบิลคลิก L2 / L1 = ความเร็วต่ำ / สูงของ Regular Mode</li>
+<li>กด ① ค้าง 5 วินาที = damping protection</li>
+<li>SELECT + A / Y = Handshake / Wave Hand (ยกเว้น E ที่ไม่มีท่าโต้ตอบ)</li>
+</ul>
+<p><strong>ความต่างที่สำคัญ:</strong></p>
+<table>
+<thead>
+<tr>
+<th>เรื่อง</th>
+<th>รายละเอียด</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A → B: ปุ่มหลักเปลี่ยน</td>
+<td>A ใช้ <strong>L1</strong> + ปุ่ม, ตั้งแต่ B ใช้ <strong>L2</strong> + ปุ่ม และความหมายของปุ่มสลับกัน (A: L1 + A = Damping, B: L2 + B = Damping, A: L1 + B = Zero Moment) <strong>ต้องรู้ firmware ของหุ่นก่อนกด</strong></td>
+</tr>
+<tr>
+<td>เอว 1-DoF / 3-DoF</td>
+<td>A แยกเป็นสองโหมด (R1 + X / R1 + Y) พร้อม Keep Stepping ด้วย START, B รวมไว้ใน Regular, C/D (23dof) มีแค่ R1 + X เพราะเอวมีแกนเดียว</td>
+</tr>
+<tr>
+<td>Climb Mode</td>
+<td>มีเฉพาะ C และ D (R2 + B ▲, ดับเบิลคลิก START = ย่ำ/ยืน)</td>
+</tr>
+<tr>
+<td>Adapt Rise</td>
+<td>มีเฉพาะ D และ E (R1 + R2 + X) และใช้แทน ⑤ ในลำดับเปิดตอนนอน</td>
+</tr>
+<tr>
+<td>ท่าโต้ตอบ</td>
+<td>B: 3 ท่า (มี Turn Around and Wave), C: 7 ท่า (Reject, ดับเบิลคลิก Y/X/A/B), D: 5 ท่า (ไม่มี Reject, Right Raise), E: ไม่มี</td>
+</tr>
+<tr>
+<td>ท่าเต้น / โหมดเสียง</td>
+<td>มีเฉพาะ D (R1 + B เข้าโหมดเต้น, R1 + R2 + Y สลับเสียง)</td>
+</tr>
+<tr>
+<td>ต่อสู้</td>
+<td>มีเฉพาะ E (R1 + A ▲) ปุ่ม R1/R2/L1 + D-pad กลายเป็นท่าต่อย/เตะ/combo และ Regular เปลี่ยนเป็น R1 + Y</td>
+</tr>
+<tr>
+<td>SELECT</td>
+<td>B–D: ใช้คู่กับ A/Y/X เป็นท่าโต้ตอบ, E: ใช้คู่กับ R1/R2 เป็น Combo Punch / Ram</td>
+</tr>
+<tr>
+<td>START</td>
+<td>A: ย่ำ/หยุด, C/D: ย่ำ/ยืนใน Climb, D: ดับเบิลคลิกหยุดท่าเต้นฉุกเฉิน</td>
+</tr>
+</tbody>
+</table>
+<h2>8. เทียบกับ g1_ctrl ของเรา</h2>
+<p>ปุ่มเหล่านี้เป็นของ controller ในตัว Unitree ตอนรัน <code>g1_ctrl</code> ต้องเข้า <strong>debug mode</strong> ก่อน (L2 + R2 ตามคู่มือ Unitree, PDF ชุดนี้ไม่ได้ระบุ) controller ในตัวจะหยุด แล้ว <code>g1_ctrl</code> อ่านรีโมตจาก <code>rt/lowstate</code> เอง</p>
+<table>
+<thead>
+<tr>
+<th><code>g1_ctrl</code> (<code>deploy/robots/g1_23dof/config/config.yaml</code>)</th>
+<th>ปุ่ม</th>
+<th>ปุ่มเดียวกันใน firmware ≥ 8.2</th>
+<th>ความหมายใกล้กันไหม</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Passive → FixStand</td>
+<td>LT (L2) + ↑</td>
+<td>② Locked Standing</td>
+<td>ใกล้กัน (ยืนค้างท่า)</td>
+</tr>
+<tr>
+<td>FixStand → Velocity (policy)</td>
+<td>RT (R2) + A</td>
+<td>③ Running Mode</td>
+<td>ใกล้กัน (เข้าโหมดเดิน)</td>
+</tr>
+<tr>
+<td>ทุกโหมด → Passive (หยุดฉุกเฉิน)</td>
+<td>LT (L2) + B</td>
+<td>① Damping</td>
+<td>ใกล้กัน (หน่วง kp = 0)</td>
+</tr>
+<tr>
+<td>สั่งความเร็ว</td>
+<td>stick ซ้าย = vx / vy, stick ขวาแกนนอน = wz</td>
+<td>–</td>
+<td>–</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><code>g1_ctrl</code> เลือกปุ่มให้ตรงกับความหมายของ firmware ≥ 8.2 คนที่เคยใช้รีโมตจึงจำง่าย แต่ <strong>ถ้าหุ่นเป็น firmware &lt; 8.2 (A) ปุ่ม L2 + B ใน firmware เดิมไม่ใช่ Damping</strong> ตอนอยู่ใน debug mode ไม่มีปัญหา เพราะ <code>g1_ctrl</code> เป็นคนอ่านปุ่ม</li>
+<li><code>g1_ctrl</code> ไม่มีโหมดอื่น (นั่ง, เต้น, ต่อสู้) ปุ่มอื่นใช้ไม่ได้ระหว่างรัน <code>g1_ctrl</code></li>
+<li><strong>L2 + A ใน debug mode</strong> ไม่ใช่ ⑥ Squat ↔ Stand เอกสาร Unitree (<a href="https://support.unitree.com/home/en/G1_developer/remote_control">G1 remote control</a>) ให้กด L2 + A เพื่อยืนยันว่าเข้า debug แล้ว หุ่นจะเหยียดตัวตรง เหตุการณ์ 30/10/2026: เปิดหุ่นตอนนั่ง → L2 + R2 → L2 + A แล้วมอเตอร์ right elbow (25) และ right wrist roll (26) หลุด (<code>vol</code> 0, <code>motorstate</code> 0x80000000) รีบูตไม่หาย ยังไม่รู้ว่าเป็นสาเหตุหรือไม่ เราจึงข้ามปุ่มนี้แล้วยืนยันด้วย <code>motion_mode.py check</code> แทน</li>
+<li>เข้า debug mode <strong>ตอนหุ่นแขวนเท่านั้น</strong> (Unitree รองรับเฉพาะตอน zero torque หรือ damping): L2 + B (Damping) → L2 + R2 แล้วเปิด <code>g1_ctrl</code> · L2 + B เป็นปุ่มหยุดฉุกเฉินได้แม้ใน debug</li>
+<li>ห้ามออกจาก debug mode ขณะ <code>g1_ctrl</code> ยังรันอยู่ controller ในตัวน่าจะกลับมาทำงานและสั่งมอเตอร์แย่งกับ <code>g1_ctrl</code> (ยังไม่ได้ทดสอบ)</li>
+</ul>
+</body></html>
