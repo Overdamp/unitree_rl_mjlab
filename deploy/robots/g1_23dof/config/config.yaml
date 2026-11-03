@@ -7,6 +7,8 @@ FSM:
     Velocity:
       id: 3
       type: RLBase
+    Handover:
+      id: 4
 
 #    Mimic_Dance1_subject2:
 #      id: 5
@@ -15,6 +17,10 @@ FSM:
   Passive:
     transitions: 
       FixStand: LT + up.on_pressed
+      # Back to Unitree's built-in controller: hold LB + RB 1 s, then START.
+      # LB / RB are the buttons printed L1 / R1 on the Unitree remote (not L2 / R2).
+      # Hung on the gantry only (zero torque afterwards). See State_Handover.h.
+      Handover: LB(1s) + RB(1s) + start.on_pressed
     mode: [
       1,1,1,1,1,1,
       1,1,1,1,1,1,
@@ -67,6 +73,11 @@ FSM:
     # hist5_yawstand = yaw + stand fine-tune (model_19497). Hist5 policies flail when
     # hung: enter Velocity only with the feet on the ground.
     policy_dir: config/policy/velocity/v0
+
+  Handover:
+    transitions:
+      Passive: LT + B.on_pressed
+    mode: ai # motion_switcher mode name, the same as `motion_mode.py select ai`
 
   Mimic_Dance1_subject2:
     transitions:

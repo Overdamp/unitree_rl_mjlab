@@ -3,6 +3,7 @@
 #include "FSM/State_FixStand.h"
 #include "FSM/State_RLBase.h"
 #include "State_Mimic.h"
+#include "State_Handover.h"
 
 std::unique_ptr<LowCmd_t> FSMState::lowcmd = nullptr;
 std::shared_ptr<LowState_t> FSMState::lowstate = nullptr;
@@ -53,13 +54,30 @@ int main(int argc, char** argv)
     
     // Initialize FSM
     auto fsm = std::make_unique<CtrlFSM>(param::config["FSM"]);
+    // Simulation keys for Passive -> Handover ([h]) and back ([p]); the shared
+    // keyboard shortcuts only know u / v / p. Loopback only, like those.
+    if (FSMState::keyboard_fsm_shortcuts_enabled && FSMStringMap.right.count("Handover")) {
+        int passive = FSMStringMap.right.at("Passive");
+        int handover = FSMStringMap.right.at("Handover");
+        auto key_is = [](std::string k) {
+            return [k]()->bool {
+                return FSMState::keyboard && FSMState::keyboard->on_pressed &&
+                       FSMState::keyboard->key() == k;
+            };
+        };
+        for (auto & s : fsm->states) {
+            if (s->isState(passive)) s->registered_checks.emplace_back(key_is("h"), handover);
+            if (s->isState(handover)) s->registered_checks.emplace_back(key_is("p"), passive);
+        }
+    }
     fsm->start();
 
     std::cout << "Press [L2 + Up] to enter FixStand mode.\n";
     std::cout << "And then press [R2 + A] to start controlling the robot.\n";
     std::cout << "And then press [R1 + A/B/Y/X] to control the robot dance.\n";
+    std::cout << "In Passive, hold [L1 + R1] 1 s then [START] to hand over to the Unitree controller (hung only).\n";
     if (FSMState::keyboard_fsm_shortcuts_enabled) {
-        std::cout << "Simulation keyboard: [u] FixStand, [v] Velocity, [p] Passive.\n";
+        std::cout << "Simulation keyboard: [u] FixStand, [v] Velocity, [p] Passive, [h] Handover (from Passive).\n";
         std::cout << "Keyboard FSM shortcuts are enabled only with --network=lo.\n";
         std::cout << "Startup: Pause MuJoCo, Load key 0 (stand_ready), press [u] then [v] here, then Run MuJoCo.\n";
         std::cout << "Velocity keys: [w/s/a/d] move, [q/e] turn, [x/space] zero velocity. Commands stay active until changed.\n";
