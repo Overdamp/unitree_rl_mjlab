@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>G1-23DoF Test Day 3/11</title>
+<style>
+  @page { size: A4; margin: 11mm 11mm 12mm 11mm; }
+  :root { --line: #999; --code-bg: #f2f2f2; --head-bg: #e6e6e6; --warn: #b00000; }
+  body { font-family: "Noto Sans Thai", "Noto Sans", sans-serif; font-size: 9.6pt; line-height: 1.32; color: #000; background: #fff; margin: 0; }
+  h1 { font-size: 15pt; margin: 0 0 2pt 0; }
+  .meta { font-size: 8.6pt; margin-bottom: 5pt; }
+  h2 { font-size: 11pt; background: var(--head-bg); padding: 2pt 5pt; margin: 7pt 0 3pt 0; break-after: avoid; }
+  section { break-inside: avoid; }
+  ul { list-style: none; padding-left: 0; margin: 2pt 0; }
+  li { margin: 1.5pt 0 1.5pt 0; padding-left: 15pt; text-indent: -15pt; }
+  li::before { content: "☐  "; font-size: 10.5pt; }
+  li.note::before { content: "•  "; }
+  pre { font-family: "DejaVu Sans Mono", monospace; font-size: 8.2pt; background: var(--code-bg); border: 1px solid #ccc; padding: 3pt 5pt; margin: 2pt 0 4pt 0; white-space: pre-wrap; word-break: break-all; }
+  code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.4pt; }
+  .term { font-weight: bold; }
+  table { border-collapse: collapse; width: 100%; font-size: 8.8pt; margin: 2pt 0 4pt 0; }
+  th, td { border: 1px solid var(--line); padding: 1.5pt 4pt; text-align: left; vertical-align: top; }
+  th { background: var(--head-bg); }
+  .stop { border: 2px solid var(--warn); padding: 4pt 6pt; margin: 6pt 0; break-inside: avoid; }
+  .stop b.t { color: var(--warn); }
+  .blank { display: inline-block; min-width: 38mm; border-bottom: 1px solid #000; }
+  .small { font-size: 8.4pt; }
+  .pb { break-before: page; }
+</style>
+</head>
+<body>
+<h1>G1-23DoF: แผ่นงานบ่าย 3/11/2026 (บนรอกทั้งหมด)</h1>
+<div class="meta">repo <code>~/nvidia/unitree/unitree_rl_mjlab</code> · branch <code>phase3-delay-dr</code> · env <code>conda activate g1_sdk</code> · สคริปต์อยู่ที่ <code>S=deploy/robots/g1_23dof/scripts</code> ·
+วันนี้<b>ไม่ลงพื้น</b> · เริ่ม <span class="blank" style="min-width:20mm"></span> SOC เริ่ม <span class="blank" style="min-width:15mm"></span></div>
+
+<div class="stop">
+<b class="t">หยุดทันที (L2 + B)</b> เมื่อข้อต่อไปผิดทิศ / สั่นถี่ / เสียงผิดปกติ / มอเตอร์ &gt; 70 °C / มีคนพูด "หยุด" ·
+<b class="t">หุ่นแขวนรอกตลอด</b> ตั้งแต่เปิดจนปิด · <b class="t">ไม่กด L2 + A</b> · เข้า debug ด้วยคอมพ์ (<code>release</code>) ไม่ใช้ L2 + R2 (2/11: กดแล้วยังเป็น <code>ai</code>)
+</div>
+
+<section>
+<h2>0. เปิดหุ่นและเชื่อมต่อ</h2>
+<ul>
+<li>เปิดหุ่น<b>ตอนแขวน</b> รอบูตเสร็จ <b>ยังไม่กดปุ่มรีโมท</b></li>
+<li>เน็ตเวิร์ก (multicast ของ lo หายทุกครั้งที่รีบูตคอมพ์):</li>
+</ul>
+<pre>sudo ip addr add 192.168.123.123/24 dev enp43s0 ; sudo ip link set enp43s0 up
+sudo ip link set lo multicast on
+ping -c 3 192.168.123.161                                   # 0% loss
+cd ~/nvidia/unitree/unitree_rl_mjlab ; conda activate g1_sdk ; S=deploy/robots/g1_23dof/scripts</pre>
+</section>
+
+<section>
+<h2>1. สุขภาพหุ่น (read-only)</h2>
+<pre>python $S/robot_health.py</pre>
+<ul>
+<li><b>ทุกบรรทัด PASS</b> (lowstate ~1000 Hz, mode_machine 4, lowcmd 0, <b>all 23 motors online</b>, อุณหภูมิ &lt; 60 °C)</li>
+<li class="note">rate ต่ำ ~350 Hz = เพิ่งบูต อ่านซ้ำอีกครั้ง · ได้ <code>name='ai'</code> เป็นเรื่องปกติก่อนข้อ 2</li>
+<li class="note"><b class="t" style="color:#b00000">FAIL offline 25/26 (ศอก/ข้อมือขวา)</b> → หยุดงานบนหุ่น บันทึกค่าไว้ (แก้ผ่านแอป Unitree Explore ตามวิดีโอ แล้วกลับมาข้อ 1)</li>
+</ul>
+</section>
+
+<section>
+<h2>2. เช็คค่าศูนย์ข้อต่อ (หลังพี่แก้ผ่านแอป 2/11) ★ ต้องผ่านก่อนข้อ 4–6</h2>
+<pre>python $S/offset_check.py --joints right_elbow,right_wrist,right_shoulder   # แขนขวาก่อน
+python $S/offset_check.py                                                    # ทั้ง 23 ข้อต่อ (ถ้ามีเวลา)</pre>
+<ul>
+<li>หุ่นยัง zero torque / damping: หมุน<b>ทีละข้อต่อช้าๆ จนชนสุดทั้งสองทาง</b> (ไม่ต้องออกแรงกด) แล้ว Ctrl-C</li>
+<li>ทุกข้อต่อที่หมุน = <b>OK</b> (ห่างจุดชนสุดของ 28/10 ไม่เกิน 0.03 rad)</li>
+<li class="note"><code>not reached</code> = ยังหมุนไม่สุด หมุนซ้ำ · <code>SHIFT +x</code> = ค่าศูนย์เปลี่ยน (ถูก calibrate) → <b>ไม่รัน policy</b> จดค่าไว้แล้วคุยกันก่อน</li>
+<li>ศอกขวา <span class="blank" style="min-width:25mm"></span> ข้อมือขวา <span class="blank" style="min-width:25mm"></span> ไหล่ขวา <span class="blank" style="min-width:25mm"></span></li>
+</ul>
+</section>
+
+<section>
+<h2>3. เข้า debug + เปิด byobu</h2>
+<pre>python $S/motion_mode.py release        # พิมพ์ yes (หุ่นแขวน) → released
+python $S/motion_mode.py check          # name=''</pre>
+<ul>
+<li>ไฟหัว <b>เหลือง</b> (debug) สีที่เห็น <span class="blank" style="min-width:25mm"></span></li>
+<li class="note">byobu: <code>$S/deploy_byobu.sh RUN TAG</code> · T1 lowstate · T2 lowcmd · T3 g1_ctrl · T4 คำสั่ง · คลิกเลือกช่อง หรือ Shift + ลูกศร</li>
+</ul>
+</section>
+
+<section>
+<h2>4. sysid เบาๆ (ศอกซ้าย step) เทียบ 30/10</h2>
+<pre>$S/deploy_byobu.sh 1 sysid               # T1/T2 Enter, T3 ไม่เปิด g1_ctrl
+python $S/sysid_motion.py --dry-run
+python $S/sysid_motion.py --groups armL --joints elbow --kinds step --segments ~/sysid_seg_20261103_light.csv
+python $S/sysid_motion.py --groups armR --joints elbow --kinds step --segments ~/sysid_seg_20261103_lightR.csv   # ศอกขวา</pre>
+<ul>
+<li>ท่ายืนนุ่ม ศอกขยับ step ไม่แกว่งค้าง · <b>ลองกด L2 + B ครั้งหนึ่ง</b> ต้องขึ้น <code>-&gt; damping (remote L2 + B)</code></li>
+<li>Ctrl-C T1/T2 → <code>python $S/pd_check.py ~/g1_state_20261103_sysid1.csv ~/g1_cmd_20261103_sysid1.csv</code> : <code>kp x</code> ≈ 1 (30/10: 1.02)</li>
+<li class="note">ผ่านทั้งสองศอก → รอบเต็มได้ (~8 นาที): <code>--segments ~/sysid_seg_20261103_full.csv</code> (ตั้งชื่อใหม่ทุกครั้ง)</li>
+</ul>
+</section>
+
+<section class="pb">
+<h2>5. FixStand ด้วย gain ที่เทรน (BeyondMimic) · ทดสอบใน sim แล้ว 2/11</h2>
+<pre>tmux kill-session -t g1deploy                     # ปิดชุดข้อ 4 ก่อน
+$S/fixstand_train_gains.sh
+G1_CTRL_DIR=/tmp/g1_fixstand_train/build $S/deploy_byobu.sh 1 bm</pre>
+<ul>
+<li>T1/T2 Enter · T3 Enter (g1_ctrl จาก /tmp) · <b>L2 + ↑</b> เข้า FixStand · T2 = <code>gains match: Velocity</code> ไม่มี <code>MISMATCH</code></li>
+<li>ค้าง 30 s: ไม่สั่น · แขนห้อยห่างท่า ~0.05 rad (sim) ถ้า &gt; 0.15 rad = kp จริงอ่อน · <b>R2 + A ต้องไม่ทำงาน</b> (ล็อกไว้)</li>
+<li>ดันทีละกลุ่ม 0.1–0.2 rad แล้วปล่อย / ดึงแล้วปล่อยทันที → <b>L2 + B</b></li>
+<li>Ctrl-C T1/T2 → <code>pd_check.py ~/g1_state_20261103_bm1.csv ~/g1_cmd_20261103_bm1.csv</code> : <code>kp x</code> 0.8–1.2, <code>kd x</code> 0.5–1.5</li>
+</ul>
+</section>
+
+<section>
+<h2>6. Handover ครั้งแรกบนหุ่นจริง + ปิดเครื่อง</h2>
+<pre>tmux kill-session -t g1deploy ; $S/deploy_byobu.sh 2 run      # g1_ctrl ตัวปกติ (มี Handover)</pre>
+<ul>
+<li>T3 Enter → g1_ctrl อยู่ <b>Passive</b> (ห้ามทำจาก FixStand)</li>
+<li>กด <b>L1 + R1 ค้าง 1 วินาที แล้วกด START</b> (ปุ่มที่เขียน L1 / R1 บนรีโมท ไม่ใช่ L2 / R2)</li>
+<li>T3 ขึ้น <code>Handover: SelectMode('ai') ok ...</code> แล้ว g1_ctrl ปิดเอง · ไฟหัว <b>ม่วง</b> · T2 ไม่มี lowcmd</li>
+<li>T4: <code>python $S/motion_mode.py check</code> → <code>name='ai'</code></li>
+<li class="note">ถ้าขึ้น <code>failed, code ...</code> (~5 s): หุ่นกลับ damping เอง → L2 + B → Ctrl-C T3 → <code>motion_mode.py select ai</code> แทน และจด code ไว้</li>
+<li>ท้ายวัน: <code>python $S/robot_health.py</code> (SOC จบ <span class="blank" style="min-width:15mm"></span>) → หุ่นยังแขวน → ปิดสวิตช์</li>
+</ul>
+</section>
+
+<div class="stop">
+<b class="t">ห้ามวันนี้:</b> ลงพื้น / Velocity (R2 + A ใน g1_ctrl ตัวปกติ) · ปิดเครื่องที่เก้าอี้ · L2 + B ตอนยืนบนพื้นโดยไม่มีรอก ·
+calibrate ข้อต่อในแอปเอง (ถ้าข้อ 2 ขึ้น SHIFT ให้หยุดแล้วคุยกันก่อน)
+</div>
+
+<section>
+<h2>บันทึก</h2>
+<table>
+<tr><th style="width:22%">ข้อ</th><th style="width:14%">ผ่าน?</th><th>ค่า / ไฟล์ / หมายเหตุ</th></tr>
+<tr><td>1 สุขภาพ</td><td></td><td></td></tr>
+<tr><td>2 ค่าศูนย์ (offset)</td><td></td><td></td></tr>
+<tr><td>3 debug (สีไฟ)</td><td></td><td></td></tr>
+<tr><td>4 sysid ศอก ซ้าย/ขวา</td><td></td><td></td></tr>
+<tr><td>5 FixStand gain เทรน</td><td></td><td></td></tr>
+<tr><td>6 Handover</td><td></td><td></td></tr>
+</table>
+</section>
+</body>
+</html>
