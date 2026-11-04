@@ -10,6 +10,7 @@ then
 
   python deploy/robots/g1_23dof/scripts/pd_check.py state.csv cmd.csv
   python deploy/robots/g1_23dof/scripts/pd_check.py state.csv cmd.csv --replay --t0 5 --t1 25
+  python deploy/robots/g1_23dof/scripts/pd_check.py state.csv cmd.csv --segments ~/sysid_seg.csv
 
 1. Torque check (always): for each lowstate sample, take the lowcmd in effect
    (zero-order hold) and compare tau = kp*(q_des - q) + kd*(dq_des - dq) + tau_ff
@@ -22,6 +23,13 @@ then
    the recorded q, and compare simulated q with the real q. Large errors or lag
    mean the sim actuator (armature, friction, delay) differs from the real one.
    --armature train uses the training armature instead of the MJCF value (0.01).
+
+3. Segments (--segments, from sysid_motion.py): fit each step / chirp test on
+   its own joint and time window only, with a constant tau_est offset:
+   tau_est - tau_ff = a*P + b*D + c. At the training gains the hold torques are
+   small (a few Nm), so a tau_est offset of 0.1-0.3 Nm biases the whole-log fit
+   (3/11/2026: right elbow 0.61 whole log, 0.96 on its step with the offset).
+   Steps give kp; chirps move fast enough to give kd as well.
 """
 
 import argparse
@@ -52,6 +60,7 @@ MIN_TAU_RMS = 0.3  # Nm, below this the torque fit is noise
 MIN_MOTION_STD = 0.02  # rad, joints that barely moved are not scored in the replay
 MAX_LAG_S = 0.1
 MAX_CMD_DELAY_S = 0.03
+MIN_SEG_CORR = 0.8  # fit vs tau_est, per segment
 SATURATION_FRAC = 0.95  # of the MJCF effort limit
 
 
@@ -97,7 +106,7 @@ def effort_limits() -> np.ndarray:
   return np.abs(m.actuator_ctrlrange).max(axis=1)
 
 
-def torque_check(state, cmd, expected) -> None:
+def torque_check(state, cmd, expected) -> float:
   # The motor applies a command some time after g1_ctrl publishes it. Fit that
   # delay first (shared by all joints), or a few ms of latency looks like wrong gains.
   joints = list(G1_23DOF_JOINTS)
@@ -166,6 +175,47 @@ def torque_check(state, cmd, expected) -> None:
         f" {rms_e:8.2f} {rms_r:8.2f} {a:5.2f} {b:5.2f} {corr:5.2f} {sat:5.1f}  {note}"
       )
     print(f"  -> {'OK' if not flagged else f'{flagged} joint(s) to check'}")
+  return best_delay
+
+
+def segment_check(state, cmd, delay: float, path: Path) -> None:
+  with open(path, newline="") as f:
+    segs = [r for r in csv.DictReader(f) if int(r["slot"]) >= 0]
+  st, _, p_term, d_term, tau_exp = expected_torque(state, cmd, delay)
+  tau_ff = tau_exp - p_term - d_term
+  rms = lambda x: float(np.sqrt(np.mean(x**2))) if len(x) else 0.0  # noqa: E731
+  print(f"\nSegments ({path.name}): per test, own joint, fit tau_est - tau_ff = a*P + b*D + offset"
+        f" (delay {delay * 1e3:.0f} ms)")
+  print(f"  {'test':<22} {'kind':<5} {'amp':>5} {'rms P':>6} {'rms D':>6} {'kp x':>5} {'kd x':>5} {'off Nm':>7} {'corr':>5}  note")
+  flagged = 0
+  for s in segs:
+    i = int(s["slot"])
+    m = (st["t"] >= float(s["t0"])) & (st["t"] <= float(s["t1"]))
+    if m.sum() < 100:
+      print(f"  {s['test']:<22} {s['kind']:<5} {float(s['amp']):5.2f}  too few samples (log overlap?)")
+      continue
+    P, D, y = p_term[m, i], d_term[m, i], st["tau"][m, i] - tau_ff[m, i]
+    p_ok, d_ok = rms(P) >= MIN_TAU_RMS, rms(D) >= MIN_TAU_RMS
+    cols = [P] * p_ok + [D] * d_ok + [np.ones_like(P)]
+    fit = np.linalg.lstsq(np.stack(cols, axis=1), y, rcond=None)[0]
+    a = float(fit[0]) if p_ok else float("nan")
+    b = float(fit[int(p_ok)]) if d_ok else float("nan")
+    off = float(fit[-1])
+    pred = np.stack(cols, axis=1) @ fit
+    corr = float(np.corrcoef(pred, y)[0, 1]) if np.std(pred) > 1e-9 and np.std(y) > 1e-9 else float("nan")
+    note = ""
+    if not (p_ok or d_ok):
+      note = "small torque, not scored"
+    elif (p_ok and not 0.8 <= a <= 1.2) or (d_ok and not 0.5 <= b <= 1.5) or not corr >= MIN_SEG_CORR:
+      note = "!! CHECK"
+    if s.get("completed", "1") == "0":
+      note = (note + " (stopped early)").strip()
+    if not d_ok and note != "small torque, not scored":
+      note = (note + " (kd not scored: small term)").strip()
+    flagged += note.startswith("!!")
+    print(f"  {s['test']:<22} {s['kind']:<5} {float(s['amp']):5.2f} {rms(P):6.2f} {rms(D):6.2f}"
+          f" {a:5.2f} {b:5.2f} {off:+7.2f} {corr:5.2f}  {note}")
+  print(f"  -> {'OK' if not flagged else f'{flagged} test(s) to check'}")
 
 
 def replay(state, cmd, args) -> None:
@@ -269,6 +319,7 @@ def main() -> int:
   parser.add_argument("--armature", choices=("mjcf", "train"), default="mjcf")
   parser.add_argument("--delay-ms", type=float, default=0.0, help="extra command delay in the replay")
   parser.add_argument("--save", type=Path, default=None, help="write real and simulated q to this CSV")
+  parser.add_argument("--segments", type=Path, default=None, help="sysid_motion.py --segments CSV: fit per test")
   args = parser.parse_args()
 
   expected = expected_gains(CONFIG_YAML, args.deploy)
@@ -276,7 +327,9 @@ def main() -> int:
   state = read_csv(args.lowstate_csv, ["t", "q", "dq", "tau"], args.decimate)
   print(f"lowstate {len(state['t'])} rows, lowcmd {len(cmd['t'])} rows,"
         f" overlap {max(0.0, min(state['t'][-1], cmd['t'][-1]) - max(state['t'][0], cmd['t'][0])):.1f} s\n")
-  torque_check(state, cmd, expected)
+  delay = torque_check(state, cmd, expected)
+  if args.segments:
+    segment_check(state, cmd, delay, args.segments)
   if args.replay:
     full = read_csv(args.lowstate_csv, ["t", "q", "dq", "quat_w", "quat_x", "quat_y", "quat_z"])
     full["quat"] = np.stack([full.pop(k) for k in ("quat_w", "quat_x", "quat_y", "quat_z")], axis=1)
