@@ -57,6 +57,29 @@ TRAIN_ARMATURE = [
 ]
 
 MIN_TAU_RMS = 0.3  # Nm, below this the torque fit is noise
+
+
+def rms(x: np.ndarray) -> float:
+  return float(np.sqrt(np.mean(x**2))) if len(x) else 0.0
+
+
+def fit_pd(P: np.ndarray, D: np.ndarray, y: np.ndarray, offset: bool) -> tuple[float, float, float, np.ndarray]:
+  """Least squares y ~ a*P + b*D (+ c): returns a, b, c and the fitted y.
+
+  Both terms stay in the fit whenever they carry any torque, even when one is
+  too small to score its gain: a dropped term that is correlated with the other
+  biases the other gain (sim chirp, shoulder roll: kp x 0.67 without D, 0.99 with).
+  """
+  use_p, use_d = rms(P) > 1e-6, rms(D) > 1e-6
+  cols = [P] * use_p + [D] * use_d + [np.ones_like(y)] * offset
+  if not cols:
+    return float("nan"), float("nan"), 0.0, np.zeros_like(y)
+  X = np.stack(cols, axis=1)
+  fit = np.linalg.lstsq(X, y, rcond=None)[0]
+  a = float(fit[0]) if use_p else float("nan")
+  b = float(fit[int(use_p)]) if use_d else float("nan")
+  c = float(fit[-1]) if offset else 0.0
+  return a, b, c, X @ fit
 MIN_MOTION_STD = 0.02  # rad, joints that barely moved are not scored in the replay
 MAX_LAG_S = 0.1
 MAX_CMD_DELAY_S = 0.03
@@ -146,16 +169,14 @@ def torque_check(state, cmd, expected) -> float:
       sat = 100.0 * (1.0 - u.sum() / m.sum())
       e, r = tau_exp[u, idx], st["tau"][u, idx]
       P, D, ff = p_term[u, idx], d_term[u, idx], tau_ff[u, idx]
-      rms = lambda x: float(np.sqrt(np.mean(x**2))) if len(x) else 0.0  # noqa: E731
       rms_e, rms_r = rms(e), rms(r)
       corr = float(np.corrcoef(e, r)[0, 1]) if len(e) > 2 and np.std(e) > 1e-6 and np.std(r) > 1e-6 else float("nan")
-      # Each gain is only identifiable when its term carries torque (kp = 0 in
-      # Passive, small D term when joints move slowly).
+      # Each gain is only scored when its term carries torque (kp = 0 in
+      # Passive, small D term when joints move slowly), but both stay in the fit.
       p_scored, d_scored = rms(P) >= MIN_TAU_RMS, rms(D) >= MIN_TAU_RMS
-      cols = [P] * p_scored + [D] * d_scored
-      fit = np.linalg.lstsq(np.stack(cols, axis=1), r - ff, rcond=None)[0] if cols else []
-      a = float(fit[0]) if p_scored else float("nan")
-      b = float(fit[-1]) if d_scored else float("nan")
+      a, b, _, _ = fit_pd(P, D, r - ff, offset=False)
+      a = a if p_scored else float("nan")
+      b = b if d_scored else float("nan")
       note = ""
       if len(e) < 100:
         note = "saturated, not scored"
@@ -183,7 +204,6 @@ def segment_check(state, cmd, delay: float, path: Path) -> None:
     segs = [r for r in csv.DictReader(f) if int(r["slot"]) >= 0]
   st, _, p_term, d_term, tau_exp = expected_torque(state, cmd, delay)
   tau_ff = tau_exp - p_term - d_term
-  rms = lambda x: float(np.sqrt(np.mean(x**2))) if len(x) else 0.0  # noqa: E731
   print(f"\nSegments ({path.name}): per test, own joint, fit tau_est - tau_ff = a*P + b*D + offset"
         f" (delay {delay * 1e3:.0f} ms)")
   print(f"  {'test':<22} {'kind':<5} {'amp':>5} {'rms P':>6} {'rms D':>6} {'kp x':>5} {'kd x':>5} {'off Nm':>7} {'corr':>5}  note")
@@ -196,12 +216,9 @@ def segment_check(state, cmd, delay: float, path: Path) -> None:
       continue
     P, D, y = p_term[m, i], d_term[m, i], st["tau"][m, i] - tau_ff[m, i]
     p_ok, d_ok = rms(P) >= MIN_TAU_RMS, rms(D) >= MIN_TAU_RMS
-    cols = [P] * p_ok + [D] * d_ok + [np.ones_like(P)]
-    fit = np.linalg.lstsq(np.stack(cols, axis=1), y, rcond=None)[0]
-    a = float(fit[0]) if p_ok else float("nan")
-    b = float(fit[int(p_ok)]) if d_ok else float("nan")
-    off = float(fit[-1])
-    pred = np.stack(cols, axis=1) @ fit
+    a, b, off, pred = fit_pd(P, D, y, offset=True)
+    a = a if p_ok else float("nan")
+    b = b if d_ok else float("nan")
     corr = float(np.corrcoef(pred, y)[0, 1]) if np.std(pred) > 1e-9 and np.std(y) > 1e-9 else float("nan")
     note = ""
     if not (p_ok or d_ok):
