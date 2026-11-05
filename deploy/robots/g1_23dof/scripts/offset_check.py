@@ -20,8 +20,8 @@ The final table is also saved to ~/offset_check_<date>_<time>.txt (--out).
 
 Never publishes rt/lowcmd.
 
-  python deploy/robots/g1_23dof/scripts/offset_check.py --joints right_elbow,right_wrist_roll
-  python deploy/robots/g1_23dof/scripts/offset_check.py                      # all 23 joints
+  python deploy/robots/g1_23dof/scripts/offset_check.py --iface enp43s0 --joints right_elbow,right_wrist_roll
+  python deploy/robots/g1_23dof/scripts/offset_check.py --iface enp43s0       # all 23 joints (default lo = sim)
   python deploy/robots/g1_23dof/scripts/offset_check.py --csv ~/g1_joints_20261028_1848.csv
 """
 
@@ -154,12 +154,16 @@ def main() -> int:
   parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
   parser.add_argument("--csv", type=Path, default=None, help="read a lowstate_monitor.py log instead of the robot")
   parser.add_argument("--joints", default=None, help="comma-separated name parts, e.g. right_elbow,wrist (default all)")
-  parser.add_argument("--iface", default="enp43s0", help="DDS network interface")
-  parser.add_argument("--domain", type=int, default=0)
+  parser.add_argument("--iface", default="lo", help="lo = sim (default), enp43s0 = real robot (say it explicitly)")
+  parser.add_argument("--domain", type=int, default=None, help="default: 1 on lo (sim), 0 otherwise (real robot)")
   parser.add_argument("--duration", type=float, default=0.0, help="stop after N seconds (0 = until Ctrl-C)")
   parser.add_argument("--out", default=None,
                       help="save the final table here (default ~/offset_check_<date>_<time>.txt, '' = do not save)")
   args = parser.parse_args()
+  # Sim is the default; the real robot needs an explicit --iface enp43s0.
+  if args.domain is None:
+    args.domain = 1 if args.iface == "lo" else 0
+  print(f"DDS: {'SIM' if args.iface == 'lo' else 'REAL ROBOT'} | iface {args.iface} | domain {args.domain}", flush=True)
 
   slots = list(REF_STOPS)
   if args.joints:

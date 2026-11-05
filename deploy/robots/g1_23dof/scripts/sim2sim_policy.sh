@@ -40,7 +40,7 @@ CLEAN="env -u CYCLONEDDS_URI LD_LIBRARY_PATH=/opt/unitree_robotics/lib"
 tmux kill-session -t "${SESSION}" 2>/dev/null || true
 tmux new-session -d -s "${SESSION}" -n mujoco "cd ${REPO_ROOT}/simulate/build && ${CLEAN} ./unitree_mujoco; read"
 sleep 3
-tmux new-window -t "${SESSION}" -n g1_ctrl "cd ${WORK}/build && ${CLEAN} ./g1_ctrl --network lo; read"
-tmux new-window -t "${SESSION}" -n speed "cd ${REPO_ROOT} && ${PY} deploy/robots/g1_23dof/scripts/sim_speed_monitor.py --iface lo --log ${WORK}/speed.csv; read"
+tmux new-window -t "${SESSION}" -n g1_ctrl "cd ${WORK}/build && ${CLEAN} ./g1_ctrl --network lo --domain 1; read"
+tmux new-window -t "${SESSION}" -n speed "cd ${REPO_ROOT} && ${PY} deploy/robots/g1_23dof/scripts/sim_speed_monitor.py --iface lo --domain 1 --log ${WORK}/speed.csv; read"
 tmux select-window -t "${SESSION}:g1_ctrl"
 echo "Policy ${POLICY}, scratch copy in ${WORK}. Attach with: tmux attach -t ${SESSION}"

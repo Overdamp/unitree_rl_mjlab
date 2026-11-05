@@ -15,9 +15,9 @@ Do release / select only with the robot hung on the gantry: once released
 nothing holds the joints, and select may start in a mode that moves. select
 refuses while rt/lowcmd is being published (g1_ctrl still running).
 
-  python deploy/robots/g1_23dof/scripts/motion_mode.py check
-  python deploy/robots/g1_23dof/scripts/motion_mode.py release
-  python deploy/robots/g1_23dof/scripts/motion_mode.py select ai
+  python deploy/robots/g1_23dof/scripts/motion_mode.py check --iface enp43s0       # real robot (default lo = sim, no motion_switcher)
+  python deploy/robots/g1_23dof/scripts/motion_mode.py release --iface enp43s0
+  python deploy/robots/g1_23dof/scripts/motion_mode.py select ai --iface enp43s0
 """
 
 import argparse
@@ -64,10 +64,14 @@ def main() -> int:
   parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
   parser.add_argument("action", choices=("check", "release", "select"))
   parser.add_argument("name", nargs="?", help="mode name for select (e.g. ai, normal)")
-  parser.add_argument("--iface", default="enp43s0", help="DDS network interface")
-  parser.add_argument("--domain", type=int, default=0)
+  parser.add_argument("--iface", default="lo", help="lo = sim (default), enp43s0 = real robot (say it explicitly)")
+  parser.add_argument("--domain", type=int, default=None, help="default: 1 on lo (sim), 0 otherwise (real robot)")
   parser.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
   args = parser.parse_args()
+  # Sim is the default; the real robot needs an explicit --iface enp43s0.
+  if args.domain is None:
+    args.domain = 1 if args.iface == "lo" else 0
+  print(f"DDS: {'SIM' if args.iface == 'lo' else 'REAL ROBOT'} | iface {args.iface} | domain {args.domain}", flush=True)
   if args.action == "select" and not args.name:
     parser.error("select needs a mode name, e.g. `select ai`")
 

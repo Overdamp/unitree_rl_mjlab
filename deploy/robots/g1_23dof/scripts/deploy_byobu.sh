@@ -17,6 +17,7 @@
 #        logs: ~/g1_state_<date>_<TAG><RUN>.csv, ~/g1_cmd_<date>_<TAG><RUN>.csv
 #        G1_CTRL_DIR=<dir> runs g1_ctrl from another build dir (e.g. the scratch copy
 #        made by fixstand_train_gains.sh, TAG bm)
+#        IFACE=lo rehearses in unitree_mujoco (DOMAIN defaults to 1 on lo, 0 otherwise)
 #
 # Inside byobu: click a pane (mouse is on) or Shift + arrows to move between panes
 # (Alt + arrows switch windows, not panes),
@@ -27,6 +28,7 @@ RUN="${1:-1}"
 TAG="${2:-run}"
 SESSION="${SESSION:-g1deploy}"
 IFACE="${IFACE:-enp43s0}"
+if [ "${IFACE}" = lo ]; then DOMAIN="${DOMAIN:-1}"; else DOMAIN="${DOMAIN:-0}"; fi
 ROBOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_ROOT="$(cd "${ROBOT_DIR}/../../.." && pwd)"
 G1_CTRL_DIR="${G1_CTRL_DIR:-${ROBOT_DIR}/build}"
@@ -68,13 +70,13 @@ done
 sleep 1.5
 
 # Typed, not run.
-tmux send-keys -t "${P1}" "python ${S}/lowstate_monitor.py --iface ${IFACE} --log ~/g1_state_\${D}_\${TAG}\${RUN}.csv"
-tmux send-keys -t "${P2}" "python ${S}/lowcmd_monitor.py --iface ${IFACE} --log ~/g1_cmd_\${D}_\${TAG}\${RUN}.csv"
-tmux send-keys -t "${P3}" "cd ${G1_CTRL_DIR} && env -u CYCLONEDDS_URI LD_LIBRARY_PATH=/opt/unitree_robotics/lib ./g1_ctrl --network ${IFACE}"
+tmux send-keys -t "${P1}" "python ${S}/lowstate_monitor.py --iface ${IFACE} --domain ${DOMAIN} --log ~/g1_state_\${D}_\${TAG}\${RUN}.csv"
+tmux send-keys -t "${P2}" "python ${S}/lowcmd_monitor.py --iface ${IFACE} --domain ${DOMAIN} --log ~/g1_cmd_\${D}_\${TAG}\${RUN}.csv"
+tmux send-keys -t "${P3}" "cd ${G1_CTRL_DIR} && env -u CYCLONEDDS_URI LD_LIBRARY_PATH=/opt/unitree_robotics/lib ./g1_ctrl --network ${IFACE} --domain ${DOMAIN}"
 tmux send-keys -t "${P4}" "echo '1) ping   2) gain_check   3) motion_mode check   4) motion_mode release (if L2+R2 fails)   5) pd_check (after T1/T2 Ctrl-C)'; \
 history -s \"python ${S}/pd_check.py ~/g1_state_\${D}_\${TAG}\${RUN}.csv ~/g1_cmd_\${D}_\${TAG}\${RUN}.csv\"; \
-history -s \"python ${S}/motion_mode.py release --iface ${IFACE}\"; \
-history -s \"python ${S}/motion_mode.py check --iface ${IFACE}\"; \
+history -s \"python ${S}/motion_mode.py release --iface ${IFACE} --domain ${DOMAIN}\"; \
+history -s \"python ${S}/motion_mode.py check --iface ${IFACE} --domain ${DOMAIN}\"; \
 history -s \"python ${S}/gain_check.py ${S%/scripts}/config/policy/velocity/v0\"; \
 history -s \"ping -c 3 192.168.123.161\"" Enter
 

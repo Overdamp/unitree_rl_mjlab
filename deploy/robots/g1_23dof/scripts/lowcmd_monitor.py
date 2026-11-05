@@ -12,7 +12,7 @@ unused 23-DoF slots that should get kp = kd = 0 in Velocity.
 Record it together with lowstate_monitor.py --log and compare the torques with
 pd_check.py.
 
-  python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py --iface lo
+  python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py                            # unitree_mujoco (default lo, domain 1)
   python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py --iface enp43s0 --log /tmp/lowcmd.csv
 """
 
@@ -169,14 +169,18 @@ def render(s: dict, expected: dict) -> str:
 
 def main() -> int:
   parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-  parser.add_argument("--iface", default="enp43s0", help="DDS network interface (enp43s0 for the robot, lo for sim)")
-  parser.add_argument("--domain", type=int, default=0, help="Unitree DDS domain (default 0)")
+  parser.add_argument("--iface", default="lo", help="lo = sim (default), enp43s0 = real robot (say it explicitly)")
+  parser.add_argument("--domain", type=int, default=None, help="default: 1 on lo (sim), 0 otherwise (real robot)")
   parser.add_argument("--duration", type=float, default=0.0, help="stop after N seconds (0 = until Ctrl-C)")
   parser.add_argument("--rate", type=float, default=5.0, help="screen refresh rate in Hz")
   parser.add_argument("--log", type=Path, default=None, help="save every message to this CSV file")
   parser.add_argument("--deploy", type=Path, default=DEFAULT_DEPLOY, help="deploy.yaml that g1_ctrl loads")
   parser.add_argument("--no-clear", action="store_true", help="do not clear the screen between refreshes")
   args = parser.parse_args()
+  # Sim is the default; the real robot needs an explicit --iface enp43s0.
+  if args.domain is None:
+    args.domain = 1 if args.iface == "lo" else 0
+  print(f"DDS: {'SIM' if args.iface == 'lo' else 'REAL ROBOT'} | iface {args.iface} | domain {args.domain}", flush=True)
 
   from unitree_sdk2py.core.channel import ChannelFactoryInitialize, ChannelSubscriber
   from unitree_sdk2py.idl.unitree_hg.msg.dds_ import LowCmd_

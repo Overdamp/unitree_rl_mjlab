@@ -308,10 +308,10 @@ log ใหญ่ (30/10: 4 GB ใน ~40 นาที) ถ้าจะ `--replay
 
 ```bash
 # T3 ไม่ต้องเปิด g1_ctrl (Ctrl-C ถ้าเปิดอยู่) · T1/T2 บันทึกตามปกติ (deploy_byobu.sh 1 sysid)
-python deploy/robots/g1_23dof/scripts/sysid_motion.py --dry-run                      # ดูแผน
-python deploy/robots/g1_23dof/scripts/sysid_motion.py --groups armL --kinds step \
+python deploy/robots/g1_23dof/scripts/sysid_motion.py --iface enp43s0 --dry-run                      # ดูแผน
+python deploy/robots/g1_23dof/scripts/sysid_motion.py --iface enp43s0 --groups armL --kinds step \
     --segments ~/sysid_seg_test.csv                                                   # รอบลอง ~30 s: กด L2 + B กลางทาง
-python deploy/robots/g1_23dof/scripts/sysid_motion.py --segments ~/sysid_seg_$(date +%Y%m%d).csv   # รอบเต็ม
+python deploy/robots/g1_23dof/scripts/sysid_motion.py --iface enp43s0 --segments ~/sysid_seg_$(date +%Y%m%d).csv   # รอบเต็ม
 ```
 
 - [ ] หุ่นแขวน เท้าลอย รอบตัวว่าง, `motion_mode.py check` → `name=''`, `g1_ctrl` ไม่ได้รัน

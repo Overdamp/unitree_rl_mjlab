@@ -31,18 +31,64 @@ void init_fsm_state()
     spdlog::info("LowState timeout set to 100 ms.");
 }
 
+// --domain N picks the DDS domain: 0 = real robot, 1 = unitree_mujoco
+// (simulate/config.yaml). The shared param::helper (deploy/include/param.h)
+// rejects unknown options, so it is taken out of argv here first.
+// Returns -1 when --domain is not given (main() then picks it from --network).
+static int take_domain_arg(int& argc, char** argv)
+{
+    int domain = -1;
+    int out = 1;
+    for (int i = 1; i < argc; ++i) {
+        std::string a = argv[i];
+        std::string value;
+        if (a == "--domain" && i + 1 < argc) value = argv[++i];
+        else if (a.rfind("--domain=", 0) == 0) value = a.substr(9);
+        else { argv[out++] = argv[i]; continue; }
+        try {
+            size_t used = 0;
+            domain = std::stoi(value, &used);
+            if (used != value.size() || domain < 0) throw std::invalid_argument(value);
+        } catch (const std::exception&) {
+            std::cerr << "Bad --domain '" << value << "' (0 = real robot, 1 = sim)" << std::endl;
+            std::_Exit(1);  // exit() would trip the static keyboard thread (std::terminate)
+        }
+    }
+    argc = out;
+    argv[argc] = nullptr;
+    return domain;
+}
+
 int main(int argc, char** argv)
 {
+    for (int i = 1; i < argc; ++i) {
+        std::string a = argv[i];
+        if (a == "--help" || a == "-h")
+            std::cout << "  --domain arg          DDS domain (default: 1 on lo = sim, 0 otherwise = real robot)\n";
+    }
+    int domain = take_domain_arg(argc, argv);
+
     // Load parameters
     auto vm = param::helper(argc, argv);
-    FSMState::keyboard_fsm_shortcuts_enabled =
-        (vm["network"].as<std::string>() == "lo");
+    // Sim is the default: no --network means unitree_mujoco on lo, domain 1.
+    // The real robot needs an explicit --network enp43s0 (domain then defaults to 0).
+    // (An empty interface would let the SDK pick one itself, possibly enp43s0.)
+    std::string network = vm["network"].as<std::string>();
+    if (network.empty()) network = "lo";
+    if (domain < 0) domain = (network == "lo") ? 1 : 0;
+    FSMState::keyboard_fsm_shortcuts_enabled = (network == "lo");
 
     std::cout << " --- Unitree Robotics --- \n";
     std::cout << "     G1-23dof Controller \n";
+    std::cout << "DDS: domain " << domain << " on " << network
+              << (network == "lo" ? " (SIM, keyboard on)" : " (REAL ROBOT, keyboard off, remote only)") << "\n";
+    if (network == "lo" && domain == 0)
+        spdlog::warn("unitree_mujoco runs on domain 1 (simulate/config.yaml); domain 0 on lo finds no sim.");
+    if (network != "lo" && domain != 0)
+        spdlog::warn("The real robot uses domain 0; domain {} will not find it.", domain);
 
     // Unitree DDS Config
-    unitree::robot::ChannelFactory::Instance()->Init(0, vm["network"].as<std::string>());
+    unitree::robot::ChannelFactory::Instance()->Init(domain, network);
 
     init_fsm_state();
 

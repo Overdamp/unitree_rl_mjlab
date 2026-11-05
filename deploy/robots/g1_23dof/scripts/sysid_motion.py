@@ -22,9 +22,9 @@ Safety (robot hung on the gantry only):
   * refuses to start while rt/lowcmd is published (g1_ctrl) or, on the real
     robot, while the built-in controller runs (motion_mode.py check / release)
 
-  python deploy/robots/g1_23dof/scripts/sysid_motion.py --dry-run
-  python deploy/robots/g1_23dof/scripts/sysid_motion.py --iface lo --domain 1 --yes   # unitree_mujoco
-  python deploy/robots/g1_23dof/scripts/sysid_motion.py --groups armL,armR,waist --segments ~/sysid_seg.csv
+  python deploy/robots/g1_23dof/scripts/sysid_motion.py --dry-run                      # plan only
+  python deploy/robots/g1_23dof/scripts/sysid_motion.py --yes                          # unitree_mujoco (default lo, domain 1)
+  python deploy/robots/g1_23dof/scripts/sysid_motion.py --iface enp43s0 --groups armL,armR,waist --segments ~/sysid_seg.csv   # real robot
 """
 
 import argparse
@@ -270,8 +270,8 @@ def write_segments(path: Path, plan: list[Segment], t_start: float, t_stop: floa
 
 def main() -> int:
   parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-  parser.add_argument("--iface", default="enp43s0", help="enp43s0 for the robot, lo for unitree_mujoco")
-  parser.add_argument("--domain", type=int, default=0)
+  parser.add_argument("--iface", default="lo", help="lo = sim (default), enp43s0 = real robot (say it explicitly)")
+  parser.add_argument("--domain", type=int, default=None, help="default: 1 on lo (sim), 0 otherwise (real robot)")
   parser.add_argument("--gains", choices=("train", "unitree"), default="train")
   parser.add_argument("--deploy", type=Path, default=DEFAULT_DEPLOY, help="deploy.yaml for train gains and the pose")
   parser.add_argument("--groups", default="armL,armR,waist,legL,legR", help=f"comma list of {','.join(GROUPS)}")
@@ -281,6 +281,10 @@ def main() -> int:
   parser.add_argument("--dry-run", action="store_true", help="print and check the plan, send nothing")
   parser.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
   args = parser.parse_args()
+  # Sim is the default; the real robot needs an explicit --iface enp43s0.
+  if args.domain is None:
+    args.domain = 1 if args.iface == "lo" else 0
+  print(f"DDS: {'SIM' if args.iface == 'lo' else 'REAL ROBOT'} | iface {args.iface} | domain {args.domain}", flush=True)
 
   slots = [s for g in args.groups.split(",") for s in GROUPS[g]]
   if args.joints:

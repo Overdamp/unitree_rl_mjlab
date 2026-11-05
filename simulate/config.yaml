@@ -9,7 +9,7 @@ robot_scene: "src/assets/robots/unitree_g1/xmls/scene_g1_23dof.xml"
 #robot: "a2"
 #robot_scene: "src/assets/robots/unitree_a2/xmls/scene_a2.xml"
 
-domain_id: 0  # Domain id
+domain_id: 1  # Domain id: 1 = sim, the real robot is 0 (g1_ctrl --network lo --domain 1)
 interface: "lo" # Interface
 
 use_joystick: 0 # No gamepad attached; use the g1_ctrl terminal keyboard for simulation
