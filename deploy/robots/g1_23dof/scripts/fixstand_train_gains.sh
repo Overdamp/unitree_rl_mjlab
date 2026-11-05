@@ -8,7 +8,7 @@
 #
 # Usage: deploy/robots/g1_23dof/scripts/fixstand_train_gains.sh [policy folder, default v0]
 #        WORK=/tmp/x deploy/robots/g1_23dof/scripts/fixstand_train_gains.sh hist5_yawstand
-# Then:  G1_CTRL_DIR=/tmp/g1_fixstand_train/build deploy/robots/g1_23dof/scripts/deploy_byobu.sh 1 bm
+# Then:  IFACE=enp43s0 G1_CTRL_DIR=/tmp/g1_fixstand_train/build deploy/robots/g1_23dof/scripts/deploy_byobu.sh 1 bm
 #
 # In the copy, FixStand has no RT + A transition (Velocity cannot be entered) and
 # the unused slots get kp = kd = 0 like in Velocity. lowcmd_monitor shows
@@ -77,4 +77,4 @@ EOF
 
 echo
 echo "Scratch g1_ctrl in ${WORK} (policy ${POLICY}). Start the deploy-day panes with it:"
-echo "  G1_CTRL_DIR=${WORK}/build deploy/robots/g1_23dof/scripts/deploy_byobu.sh 1 bm"
+echo "  IFACE=enp43s0 G1_CTRL_DIR=${WORK}/build deploy/robots/g1_23dof/scripts/deploy_byobu.sh 1 bm"

@@ -230,6 +230,9 @@ python deploy/robots/g1_23dof/scripts/pd_check.py ~/g1_state_X.csv ~/g1_cmd_X.cs
 
 ### 9.0 ก่อนเริ่มทุกครั้ง
 
+- [ ] **sim ต้องปิด:** `pgrep -a unitree_mujoco` ไม่มีผลลัพธ์ ตั้งแต่ 5/11/2026 ทุกโปรแกรมใช้ sim (`lo`, domain 1) เป็นค่าเริ่มต้น คำสั่งที่ลืม `--iface enp43s0` / `--network enp43s0` จะอ่านค่าจาก sim (ได้ PASS หลอก) · `deploy_byobu.sh` ต้องใส่ `IFACE=enp43s0` และไม่ยอมเปิดโหมดหุ่นถ้า sim ยังเปิดอยู่
+- [ ] **บรรทัดแรกของทุกโปรแกรมต้องเป็น `DDS: REAL ROBOT ...`** (g1_ctrl: `(REAL ROBOT, keyboard off, remote only)`) เห็น `SIM` = ลืม flag
+- [ ] **service บนคอม 164 ที่สั่งหุ่นได้ต้องหยุด:** `ssh unitree@192.168.123.164` แล้ว `systemctl is-active fibo_legged_robot_g1 g1_arm g1_arm_web` ต้อง `inactive` ทั้ง 3 ถ้า `active` คุยกับเจ้าของก่อน แล้ว `sudo systemctl stop <ชื่อ>` (ไม่ใช่ kill)
 - [ ] หัวข้อ 1 (ความปลอดภัย, ฮาร์ดแวร์, PC) และหัวข้อ 2 (IP, ping, debug mode L2+R2) ผ่าน
 - [ ] ปิด `bringup_23dof.launch.py` / `loco_client` ของ g1pilot, ปิด viewer และ RViz (เหลือแค่ monitor 2 ตัว)
 - [ ] `md5sum deploy/robots/g1_23dof/config/policy/velocity/v0/exported/policy.onnx` = `727da8a2bc5293f617a8e06f8c13a07e`
@@ -247,10 +250,10 @@ python deploy/robots/g1_23dof/scripts/pd_check.py ~/g1_state_X.csv ~/g1_cmd_X.cs
 - [ ] terminal ที่ 3 (ไม่ source ROS หรือใช้ `env -u CYCLONEDDS_URI LD_LIBRARY_PATH=/opt/unitree_robotics/lib`):
   ```bash
   cd ~/nvidia/unitree/unitree_rl_mjlab/deploy/robots/g1_23dof/build
-  ./g1_ctrl --network enp43s0
+  ./g1_ctrl --network enp43s0        # ต้องขึ้น DDS: domain 0 on enp43s0 (REAL ROBOT ...)
   ```
   ต้องเห็น `Connected to robot`, `LowState timeout set to 100 ms`, `ONNX policy loaded successfully: .../velocity/v0/exported/policy.onnx` และไม่ขึ้น `Unmatched robot type` หรือ `The other process is using the lowcmd channel`
-- [ ] ทำก่อนวันทดสอบ (sim): `g1_ctrl` build เดียวกันกับ `unitree_mujoco` (`--network lo`) + `lowcmd_monitor --iface lo` กด `u` แล้ว `v`: ต้องขึ้น `gains match: FixStand` แล้ว `Velocity`, slot 13, 14, 20, 21, 27, 28 ได้ kp = kd = 0, ไม่มี `MISMATCH`
+- [ ] ทำก่อนวันทดสอบ (sim): `g1_ctrl` build เดียวกันกับ `unitree_mujoco` (ไม่ใส่ flag = `lo` domain 1) + `lowcmd_monitor` (ไม่ใส่ flag) หรือซ้อมทั้งชุดด้วย `IFACE=lo deploy_byobu.sh 1 simtest` กด `u` แล้ว `v`: ต้องขึ้น `gains match: FixStand` แล้ว `Velocity`, slot 13, 14, 20, 21, 27, 28 ได้ kp = kd = 0, ไม่มี `MISMATCH`
 
 ### 9.1 ขั้น 1: Passive แล้ว FixStand บน gantry (เท้าลอย)
 
@@ -288,7 +291,7 @@ python deploy/robots/g1_23dof/scripts/pd_check.py ~/g1_state_X.csv ~/g1_cmd_X.cs
 ```bash
 cd ~/nvidia/unitree/unitree_rl_mjlab
 deploy/robots/g1_23dof/scripts/fixstand_train_gains.sh            # ค่าเริ่มต้น v0 (P3b)
-G1_CTRL_DIR=/tmp/g1_fixstand_train/build deploy/robots/g1_23dof/scripts/deploy_byobu.sh 1 bm
+IFACE=enp43s0 G1_CTRL_DIR=/tmp/g1_fixstand_train/build deploy/robots/g1_23dof/scripts/deploy_byobu.sh 1 bm
 ```
 
 - [ ] หุ่นแขวน เท้าลอย, debug mode (`motion_mode.py check` → `name=''`), T1/T2 บันทึก, T3 ชื่อช่องลงท้าย `/tmp/g1_fixstand_train/build`
@@ -296,7 +299,7 @@ G1_CTRL_DIR=/tmp/g1_fixstand_train/build deploy/robots/g1_23dof/scripts/deploy_b
 - [ ] ค้าง 30 s: แขนห้อยห่างท่ามากกว่า 9.1 (kp 14.3) แต่ต้องนิ่ง ไม่สั่น ไม่แกว่งเอง
 - [ ] ดันทีละกลุ่ม 0.1–0.2 rad ค้าง 1 s แล้วปล่อย + **ดึงออกแล้วปล่อยทันที** (ช่วงที่ joint เด้งกลับเองใช้เทียบ armature ใน `pd_check --replay` ได้) กลับช้ากว่า 9.1 เป็นเรื่องปกติ แกว่งหลายรอบไม่หยุด → LT + B
 - [ ] LT + B → Ctrl-C T1/T2 → `pd_check.py ~/g1_state_<date>_bm1.csv ~/g1_cmd_<date>_bm1.csv` ช่วงที่ขึ้นชื่อ `Velocity`: `kp x` 0.8–1.2 และ `kd x` 0.5–1.5 (kd 0.9 ของแขนเป็นตัวที่ยังไม่เคยวัด)
-- [ ] จบ: Ctrl-C T3, `tmux kill-session -t g1deploy` แล้วเปิด `deploy_byobu.sh` ปกติ (ไม่มี `G1_CTRL_DIR`) ก่อนไป 9.2 เพราะสำเนานี้เข้า Velocity ไม่ได้
+- [ ] จบ: Ctrl-C T3, `tmux kill-session -t g1deploy` แล้วเปิด `IFACE=enp43s0 deploy_byobu.sh` ปกติ (ไม่มี `G1_CTRL_DIR`) ก่อนไป 9.2 เพราะสำเนานี้เข้า Velocity ไม่ได้
 
 log ใหญ่ (30/10: 4 GB ใน ~40 นาที) ถ้าจะ `--replay` ให้ตัดเฉพาะช่วงด้วย `awk` ตามคอลัมน์ `t` ก่อน
 
@@ -307,7 +310,7 @@ log ใหญ่ (30/10: 4 GB ใน ~40 นาที) ถ้าจะ `--replay
 หยุดเข้า damping (kp 0) เองเมื่อ: **L2 + B**, Ctrl-C, LowState ขาด > 50 ms, joint ห่างเป้า > 0.5 rad, มอเตอร์ > 70 °C, มอเตอร์หลุด (`vol` 0 / `motorstate` ≠ 0) และตอนจบแผน ไม่ยอมเริ่มถ้ายังมี `rt/lowcmd` (g1_ctrl) หรือ controller ในตัวยังไม่ปล่อย · ทดสอบใน `unitree_mujoco` (domain 1, elastic band) 30/10: ครบแผน, ไม่ยอมเริ่มซ้อน, Ctrl-C และ sim ตาย → damping ผ่าน · L2 + B ตรวจได้แค่ด้วย unit test (sim ไม่มีจอย) **ต้องลองกับหุ่นจริงก่อนรอบเต็ม**
 
 ```bash
-# T3 ไม่ต้องเปิด g1_ctrl (Ctrl-C ถ้าเปิดอยู่) · T1/T2 บันทึกตามปกติ (deploy_byobu.sh 1 sysid)
+# T3 ไม่ต้องเปิด g1_ctrl (Ctrl-C ถ้าเปิดอยู่) · T1/T2 บันทึกตามปกติ (`IFACE=enp43s0 deploy_byobu.sh 1 sysid`)
 python deploy/robots/g1_23dof/scripts/sysid_motion.py --iface enp43s0 --dry-run                      # ดูแผน
 python deploy/robots/g1_23dof/scripts/sysid_motion.py --iface enp43s0 --groups armL --kinds step \
     --segments ~/sysid_seg_test.csv                                                   # รอบลอง ~30 s: กด L2 + B กลางทาง

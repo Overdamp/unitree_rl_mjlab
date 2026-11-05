@@ -12,12 +12,14 @@
 # has its command typed but NOT run: check the robot, then press Enter yourself.
 # Ctrl-C a monitor to close its CSV, Up + Enter to start it again.
 #
-# Usage: deploy/robots/g1_23dof/scripts/deploy_byobu.sh [RUN] [TAG]
+# Usage: IFACE=enp43s0 deploy/robots/g1_23dof/scripts/deploy_byobu.sh [RUN] [TAG]   # real robot
+#        IFACE=lo      deploy/robots/g1_23dof/scripts/deploy_byobu.sh [RUN] [TAG]   # rehearse in unitree_mujoco
+#        IFACE is required (no default): the real robot is never picked by accident.
 #        RUN = 1, 2, ... (default 1); TAG = run (hung, kp/kd check) or walk (default run)
 #        logs: ~/g1_state_<date>_<TAG><RUN>.csv, ~/g1_cmd_<date>_<TAG><RUN>.csv
 #        G1_CTRL_DIR=<dir> runs g1_ctrl from another build dir (e.g. the scratch copy
 #        made by fixstand_train_gains.sh, TAG bm)
-#        IFACE=lo rehearses in unitree_mujoco (DOMAIN defaults to 1 on lo, 0 otherwise)
+#        DOMAIN defaults to 1 on lo (sim), 0 otherwise (real robot)
 #
 # Inside byobu: click a pane (mouse is on) or Shift + arrows to move between panes
 # (Alt + arrows switch windows, not panes),
@@ -27,7 +29,10 @@ set -euo pipefail
 RUN="${1:-1}"
 TAG="${2:-run}"
 SESSION="${SESSION:-g1deploy}"
-IFACE="${IFACE:-enp43s0}"
+if [ -z "${IFACE:-}" ]; then
+  echo "Set IFACE: IFACE=enp43s0 $0 ... (real robot) or IFACE=lo $0 ... (sim)" >&2
+  exit 1
+fi
 if [ "${IFACE}" = lo ]; then DOMAIN="${DOMAIN:-1}"; else DOMAIN="${DOMAIN:-0}"; fi
 ROBOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_ROOT="$(cd "${ROBOT_DIR}/../../.." && pwd)"
@@ -48,9 +53,19 @@ if [ ! -x "${G1_CTRL_DIR}/g1_ctrl" ]; then
   exit 1
 fi
 
+if [ "${IFACE}" = lo ]; then
+  echo -e "\e[1;42;30m  [SIM] deploy panes · lo · domain ${DOMAIN}  \e[0m"
+else
+  echo -e "\e[1;41;37m  [REAL ROBOT] deploy panes · ${IFACE} · domain ${DOMAIN}  \e[0m"
+  if pgrep -x unitree_mujoco >/dev/null; then
+    echo "unitree_mujoco is running: close it before a real-robot session (tools left on the default lo would read the sim)." >&2
+    exit 1
+  fi
+fi
+
 SETUP="cd ${REPO_ROOT} && source ~/miniconda3/etc/profile.d/conda.sh && conda activate g1_sdk && unset CYCLONEDDS_URI && RUN=${RUN} TAG=${TAG} D=\$(date +%Y%m%d) && clear"
 
-byobu new-session -d -s "${SESSION}" -n deploy
+byobu new-session -d -s "${SESSION}" -n "deploy-${IFACE}"
 P1=$(tmux display-message -p -t "${SESSION}" '#{pane_id}')
 P2=$(tmux split-window -h -t "${P1}" -P -F '#{pane_id}')
 P3=$(tmux split-window -v -t "${P1}" -P -F '#{pane_id}')
