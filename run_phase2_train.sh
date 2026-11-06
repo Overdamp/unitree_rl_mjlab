@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd /home/luke/nvidia/unitree/unitree_rl_mjlab
+cd "$(dirname "$0")"
 python scripts/train.py Unitree-G1-23Dof-Flat \
   --env.scene.num-envs=1024 \
   --agent.resume=True \
