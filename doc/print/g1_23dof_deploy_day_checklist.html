@@ -43,7 +43,7 @@
 </table>
 
 <section>
-<div class="stop"><b class="t">อัปเดต 5/11/2026: ค่าเริ่มต้นของทุกโปรแกรม = sim</b> (<code>lo</code>, domain 1) · หุ่นจริงต้องใส่ <code>--iface enp43s0</code> (python) / <code>--network enp43s0</code> (g1_ctrl) / <code>IFACE=enp43s0</code> (deploy_byobu) ทุกครั้ง · <b>ก่อนเริ่ม:</b> ปิด sim (<code>pgrep -a unitree_mujoco</code> ว่าง) · service บน 164 (<code>fibo_legged_robot_g1</code>, <code>g1_arm</code>, <code>g1_arm_web</code>) ต้อง inactive · บรรทัดแรกของทุกโปรแกรมต้องเป็น <code>DDS: REAL ROBOT</code></div>
+<div class="stop"><b class="t">อัปเดต 5/11/2026: ค่าเริ่มต้นของทุกโปรแกรม = sim</b> (<code>lo</code>, domain 1) · หุ่นจริงต้องใส่ <code>--network enp43s0</code> (ทุกโปรแกรม) / <code>IFACE=enp43s0</code> (deploy_byobu) ทุกครั้ง · <b>ก่อนเริ่ม:</b> ปิด sim (<code>pgrep -a unitree_mujoco</code> ว่าง) · service บน 164 (<code>fibo_legged_robot_g1</code>, <code>g1_arm</code>, <code>g1_arm_web</code>) ต้อง inactive · บรรทัดแรกของทุกโปรแกรมต้องเป็น <code>DDS: REAL ROBOT</code></div>
 <h2>0. ฮาร์ดแวร์และความปลอดภัย</h2>
 <ul>
   <li>แขวนหุ่นบน gantry เท้าลอยประมาณ 5 cm, เชือกรับน้ำหนักได้, รัศมี 1 m ว่าง</li>
@@ -81,21 +81,21 @@ python deploy/robots/g1_23dof/scripts/gain_check.py $P   # PASS</pre>
 <section>
 <h2>2. ปิด controller ในตัวหุ่น (เข้า debug mode)</h2>
 <ul>
-  <li>เปิดหุ่น รอจนเข้า zero-torque หรือ damping ระหว่างนี้ T4 รัน: <code>python deploy/robots/g1_23dof/scripts/motion_mode.py --iface enp43s0 check</code> แล้วจดชื่อโหมด: <span class="blank"></span></li>
+  <li>เปิดหุ่น รอจนเข้า zero-torque หรือ damping ระหว่างนี้ T4 รัน: <code>python deploy/robots/g1_23dof/scripts/motion_mode.py --network enp43s0 check</code> แล้วจดชื่อโหมด: <span class="blank"></span></li>
   <li>รีโมต (หุ่น<b>แขวนอยู่</b> ห้ามทำตอนนั่ง/นอน): <b>L2 + B</b> (Damping) แล้ว <b>L2 + R2</b> (debug mode)</li>
-  <li>T4 รัน <code>motion_mode.py --iface enp43s0 check</code> อีกครั้ง → <code>name=''</code> (released / debug) · ถ้ายังเป็น <code>'ai'</code> (30/10: จอยสั่นอย่างเดียว) → T4 <code>motion_mode.py --iface enp43s0 release</code> พิมพ์ <code>yes</code> (หุ่นต้องแขวน จะปวกทันที)</li>
+  <li>T4 รัน <code>motion_mode.py --network enp43s0 check</code> อีกครั้ง → <code>name=''</code> (released / debug) · ถ้ายังเป็น <code>'ai'</code> (30/10: จอยสั่นอย่างเดียว) → T4 <code>motion_mode.py --network enp43s0 release</code> พิมพ์ <code>yes</code> (หุ่นต้องแขวน จะปวกทันที)</li>
   <li>T1 ทุก slot ที่ใช้ต้องมีอุณหภูมิและแรงดัน ≈ 52 V (ถ้า slot ไหน 0 V หรือ T = 0 → หยุด มอเตอร์หลุด)</li>
 </ul>
 <div class="stop"><b class="t">ข้าม L2 + A:</b> Unitree ใช้ L2 + A ยืนยัน debug แต่หุ่นจะเหยียดตัวตรง ·
-30/10/2026 กดตอนหุ่นนั่ง แล้วมอเตอร์ศอกขวา (25) และข้อมือขวา (26) หลุด รีบูตไม่หาย · ยืนยันด้วย <code>motion_mode.py --iface enp43s0 check</code> แทน ·
+30/10/2026 กดตอนหุ่นนั่ง แล้วมอเตอร์ศอกขวา (25) และข้อมือขวา (26) หลุด รีบูตไม่หาย · ยืนยันด้วย <code>motion_mode.py --network enp43s0 check</code> แทน ·
 ถ้าจะกดต้องแขวนอยู่และรอบตัวว่าง · L2 + B = หยุดฉุกเฉินได้แม้ใน debug</div>
 </section>
 
 <section>
 <h2>3. เปิดบันทึกและ controller</h2>
-<pre><span class="term">T1:</span> python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --iface enp43s0 \
+<pre><span class="term">T1:</span> python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --network enp43s0 \
       --log ~/g1_state_20261030_run$RUN.csv
-<span class="term">T2:</span> python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py --iface enp43s0 \
+<span class="term">T2:</span> python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py --network enp43s0 \
       --log ~/g1_cmd_20261030_run$RUN.csv
 <span class="term">T3:</span> cd deploy/robots/g1_23dof/build
     env -u CYCLONEDDS_URI LD_LIBRARY_PATH=/opt/unitree_robotics/lib ./g1_ctrl --network enp43s0</pre>
@@ -160,9 +160,9 @@ IFACE=enp43s0 G1_CTRL_DIR=/tmp/g1_fixstand_train/build deploy/robots/g1_23dof/sc
 <section>
 <h2>6c. สั่งท่าทีละ joint (<code>sysid_motion.py</code>, แทน g1_ctrl) · เวลาเริ่ม <span class="blank" style="min-width:20mm"></span></h2>
 <pre><span class="term">T3:</span> ไม่รัน g1_ctrl · T1/T2 บันทึก (IFACE=enp43s0 deploy_byobu.sh 1 sysid)
-<span class="term">T4:</span> python deploy/robots/g1_23dof/scripts/sysid_motion.py --iface enp43s0 --dry-run
-    python deploy/robots/g1_23dof/scripts/sysid_motion.py --iface enp43s0 --groups armL --kinds step --segments ~/sysid_seg_test.csv
-    python deploy/robots/g1_23dof/scripts/sysid_motion.py --iface enp43s0 --segments ~/sysid_seg_$(date +%Y%m%d).csv</pre>
+<span class="term">T4:</span> python deploy/robots/g1_23dof/scripts/sysid_motion.py --network enp43s0 --dry-run
+    python deploy/robots/g1_23dof/scripts/sysid_motion.py --network enp43s0 --groups armL --kinds step --segments ~/sysid_seg_test.csv
+    python deploy/robots/g1_23dof/scripts/sysid_motion.py --network enp43s0 --segments ~/sysid_seg_$(date +%Y%m%d).csv</pre>
 <ul>
   <li>รอบลอง (~30 s): <b>กด L2 + B กลางทาง → ต้องขึ้น <code>-&gt; damping (remote L2 + B)</code></b> (ยังไม่เคยลองกับหุ่นจริง) ผล: <span class="blank"></span></li>
   <li>รอบเต็ม ~8 นาที: แกว่งไม่หยุด / ชนตัว / เสียงผิดปกติ → L2 + B · หยุดเองเมื่อ LowState ขาด, ห่างเป้า &gt; 0.5 rad, &gt; 70 °C, มอเตอร์หลุด</li>
@@ -172,9 +172,9 @@ IFACE=enp43s0 G1_CTRL_DIR=/tmp/g1_fixstand_train/build deploy/robots/g1_23dof/sc
 
 <section>
 <h2>7. Deploy P3b บนพื้น (ทำเมื่อข้อ 6 และ 6b ผ่านเท่านั้น)</h2>
-<pre><span class="term">T1:</span> python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --iface enp43s0 \
+<pre><span class="term">T1:</span> python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --network enp43s0 \
       --log ~/g1_state_20261030_walk$RUN.csv
-<span class="term">T2:</span> python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py --iface enp43s0 \
+<span class="term">T2:</span> python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py --network enp43s0 \
       --log ~/g1_cmd_20261030_walk$RUN.csv
 <span class="term">T3:</span> (ถ้าปิดไปแล้ว) env -u CYCLONEDDS_URI LD_LIBRARY_PATH=/opt/unitree_robotics/lib \
       ./g1_ctrl --network enp43s0</pre>
@@ -206,9 +206,9 @@ IFACE=enp43s0 G1_CTRL_DIR=/tmp/g1_fixstand_train/build deploy/robots/g1_23dof/sc
   <li>Passive (LT + B) ตอนหุ่นแขวน → Ctrl-C ที่ T3, T1 และ T2</li>
   <li>กลับโหมดรีโมต (เลือกอย่างใดอย่างหนึ่ง):</li>
 </ul>
-<pre><span class="term">T4:</span> python deploy/robots/g1_23dof/scripts/motion_mode.py --iface enp43s0 select &lt;ชื่อที่จดไว้ในข้อ 2&gt;
+<pre><span class="term">T4:</span> python deploy/robots/g1_23dof/scripts/motion_mode.py --network enp43s0 select &lt;ชื่อที่จดไว้ในข้อ 2&gt;
      #   จะปฏิเสธถ้ายังมี rt/lowcmd (g1_ctrl ยังไม่ปิด)
-     python deploy/robots/g1_23dof/scripts/motion_mode.py --iface enp43s0 check   # name ต้องไม่ว่าง
+     python deploy/robots/g1_23dof/scripts/motion_mode.py --network enp43s0 check   # name ต้องไม่ว่าง
 หรือ: ปิดเครื่องหุ่นแล้วเปิดใหม่</pre>
 <ul>
   <li>เก็บไฟล์: <code>ls -lh ~/g1_state_20261030_* ~/g1_cmd_20261030_*</code> · วิดีโอ · ผล <code>pd_check</code> · แบตตอนจบ <span class="blank"></span> V</li>

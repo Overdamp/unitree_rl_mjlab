@@ -155,10 +155,10 @@
 ```bash
 conda activate g1_sdk
 cd ~/nvidia/unitree/unitree_rl_mjlab
-python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --iface enp43s0 --log ~/g1_lowstate_$(date +%Y%m%d_%H%M).csv
+python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --network enp43s0 --log ~/g1_lowstate_$(date +%Y%m%d_%H%M).csv
 ```
 
-- `--iface lo` ใช้กับ `unitree_mujoco` (ต้องเปิด multicast บน `lo` ก่อน)
+- `--network lo` ใช้กับ `unitree_mujoco` (ต้องเปิด multicast บน `lo` ก่อน)
 - `--duration 60` หยุดเองหลัง 60 s (ใช้กับข้อ "LowState ต่อเนื่อง 1 นาที")
 - `--log` เก็บทุกข้อความเป็น CSV (q, dq, tau_est, อุณหภูมิ 29 ช่อง, quaternion, gyro) ไว้เทียบกับ sim ภายหลัง
 
@@ -191,9 +191,9 @@ subscribe `rt/lowcmd` ที่ `g1_ctrl` ส่งไปมอเตอร์ �
 
 ```bash
 # terminal 1
-python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --iface enp43s0 --log ~/g1_state_$(date +%Y%m%d_%H%M).csv
+python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --network enp43s0 --log ~/g1_state_$(date +%Y%m%d_%H%M).csv
 # terminal 2
-python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py --iface enp43s0 --log ~/g1_cmd_$(date +%Y%m%d_%H%M).csv
+python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py --network enp43s0 --log ~/g1_cmd_$(date +%Y%m%d_%H%M).csv
 ```
 
 `--deploy` ระบุ `deploy.yaml` ที่ `g1_ctrl` โหลด (ค่าเริ่มต้น `config/policy/velocity/v0`)
@@ -230,7 +230,7 @@ python deploy/robots/g1_23dof/scripts/pd_check.py ~/g1_state_X.csv ~/g1_cmd_X.cs
 
 ### 9.0 ก่อนเริ่มทุกครั้ง
 
-- [ ] **sim ต้องปิด:** `pgrep -a unitree_mujoco` ไม่มีผลลัพธ์ ตั้งแต่ 5/11/2026 ทุกโปรแกรมใช้ sim (`lo`, domain 1) เป็นค่าเริ่มต้น คำสั่งที่ลืม `--iface enp43s0` / `--network enp43s0` จะอ่านค่าจาก sim (ได้ PASS หลอก) · `deploy_byobu.sh` ต้องใส่ `IFACE=enp43s0` และไม่ยอมเปิดโหมดหุ่นถ้า sim ยังเปิดอยู่
+- [ ] **sim ต้องปิด:** `pgrep -a unitree_mujoco` ไม่มีผลลัพธ์ ตั้งแต่ 5/11/2026 ทุกโปรแกรมใช้ sim (`lo`, domain 1) เป็นค่าเริ่มต้น คำสั่งที่ลืม `--network enp43s0` จะอ่านค่าจาก sim (ได้ PASS หลอก) · `deploy_byobu.sh` ต้องใส่ `IFACE=enp43s0` และไม่ยอมเปิดโหมดหุ่นถ้า sim ยังเปิดอยู่
 - [ ] **บรรทัดแรกของทุกโปรแกรมต้องเป็น `DDS: REAL ROBOT ...`** (g1_ctrl: `(REAL ROBOT, keyboard off, remote only)`) เห็น `SIM` = ลืม flag
 - [ ] **service บนคอม 164 ที่สั่งหุ่นได้ต้องหยุด:** `ssh unitree@192.168.123.164` แล้ว `systemctl is-active fibo_legged_robot_g1 g1_arm g1_arm_web` ต้อง `inactive` ทั้ง 3 ถ้า `active` คุยกับเจ้าของก่อน แล้ว `sudo systemctl stop <ชื่อ>` (ไม่ใช่ kill)
 - [ ] หัวข้อ 1 (ความปลอดภัย, ฮาร์ดแวร์, PC) และหัวข้อ 2 (IP, ping, debug mode L2+R2) ผ่าน
@@ -244,8 +244,8 @@ python deploy/robots/g1_23dof/scripts/pd_check.py ~/g1_state_X.csv ~/g1_cmd_X.cs
   ```bash
   cd ~/nvidia/unitree/unitree_rl_mjlab
   T=$(date +%Y%m%d_%H%M)
-  python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --iface enp43s0 --log ~/g1_state_$T.csv
-  python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py   --iface enp43s0 --log ~/g1_cmd_$T.csv
+  python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --network enp43s0 --log ~/g1_state_$T.csv
+  python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py   --network enp43s0 --log ~/g1_cmd_$T.csv
   ```
 - [ ] terminal ที่ 3 (ไม่ source ROS หรือใช้ `env -u CYCLONEDDS_URI LD_LIBRARY_PATH=/opt/unitree_robotics/lib`):
   ```bash
@@ -311,10 +311,10 @@ log ใหญ่ (30/10: 4 GB ใน ~40 นาที) ถ้าจะ `--replay
 
 ```bash
 # T3 ไม่ต้องเปิด g1_ctrl (Ctrl-C ถ้าเปิดอยู่) · T1/T2 บันทึกตามปกติ (`IFACE=enp43s0 deploy_byobu.sh 1 sysid`)
-python deploy/robots/g1_23dof/scripts/sysid_motion.py --iface enp43s0 --dry-run                      # ดูแผน
-python deploy/robots/g1_23dof/scripts/sysid_motion.py --iface enp43s0 --groups armL --kinds step \
+python deploy/robots/g1_23dof/scripts/sysid_motion.py --network enp43s0 --dry-run                      # ดูแผน
+python deploy/robots/g1_23dof/scripts/sysid_motion.py --network enp43s0 --groups armL --kinds step \
     --segments ~/sysid_seg_test.csv                                                   # รอบลอง ~30 s: กด L2 + B กลางทาง
-python deploy/robots/g1_23dof/scripts/sysid_motion.py --iface enp43s0 --segments ~/sysid_seg_$(date +%Y%m%d).csv   # รอบเต็ม
+python deploy/robots/g1_23dof/scripts/sysid_motion.py --network enp43s0 --segments ~/sysid_seg_$(date +%Y%m%d).csv   # รอบเต็ม
 ```
 
 - [ ] หุ่นแขวน เท้าลอย รอบตัวว่าง, `motion_mode.py check` → `name=''`, `g1_ctrl` ไม่ได้รัน

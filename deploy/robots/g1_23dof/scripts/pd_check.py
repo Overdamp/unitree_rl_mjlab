@@ -3,8 +3,8 @@
 
 Record both topics at the same time (same machine, both use time.monotonic()):
 
-  python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --iface enp43s0 --log state.csv
-  python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py   --iface enp43s0 --log cmd.csv
+  python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --network enp43s0 --log state.csv
+  python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py   --network enp43s0 --log cmd.csv
 
 then
 

@@ -7,7 +7,7 @@ prints 2 s averages of forward/lateral speed in the heading frame, yaw rate and
 tilt, so the keyboard commands (w = 0.4, q/e = +-0.3 rad/s, a/d = +-0.2) can be
 compared with what the robot actually does. Read-only.
 
-  python deploy/robots/g1_23dof/scripts/sim_speed_monitor.py --iface lo --domain 1 --log /tmp/speed.csv
+  python deploy/robots/g1_23dof/scripts/sim_speed_monitor.py --network lo --domain 1 --log /tmp/speed.csv
 """
 
 import argparse
@@ -24,7 +24,8 @@ WINDOW_S = 2.0
 
 def main() -> int:
   parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-  parser.add_argument("--iface", default="lo")
+  parser.add_argument("--network", "--iface", dest="iface", default="lo",
+                      help="DDS interface like g1_ctrl --network: lo = sim (default), enp43s0 = real robot (say it explicitly); --iface = old name")
   parser.add_argument("--domain", type=int, default=1, help="1 = unitree_mujoco (simulate/config.yaml)")
   parser.add_argument("--rate", type=float, default=2.0, help="print rate in Hz")
   parser.add_argument("--log", type=Path, default=None, help="CSV of t, x, y, vx, vy, wz, tilt_deg")

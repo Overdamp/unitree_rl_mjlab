@@ -11,9 +11,9 @@ q / dq / tau_est / temperature, the min/max seen so far, and the MJCF limits. On
 
 Run with the conda env that has unitree_sdk2py (``g1_sdk``):
 
-  python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --iface enp43s0
+  python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --network enp43s0
   python deploy/robots/g1_23dof/scripts/lowstate_monitor.py                          # unitree_mujoco (default lo, domain 1)
-  python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --iface enp43s0 --log /tmp/lowstate.csv
+  python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --network enp43s0 --log /tmp/lowstate.csv
 """
 
 import argparse
@@ -268,7 +268,8 @@ def summary(s: dict, limits: dict) -> str:
 
 def main() -> int:
   parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-  parser.add_argument("--iface", default="lo", help="lo = sim (default), enp43s0 = real robot (say it explicitly)")
+  parser.add_argument("--network", "--iface", dest="iface", default="lo",
+                      help="DDS interface like g1_ctrl --network: lo = sim (default), enp43s0 = real robot (say it explicitly); --iface = old name")
   parser.add_argument("--domain", type=int, default=None, help="default: 1 on lo (sim), 0 otherwise (real robot)")
   parser.add_argument("--duration", type=float, default=0.0, help="stop after N seconds (0 = until Ctrl-C)")
   parser.add_argument("--rate", type=float, default=5.0, help="screen refresh rate in Hz")
@@ -276,10 +277,10 @@ def main() -> int:
   parser.add_argument("--mjcf", type=Path, default=DEFAULT_MJCF, help="MJCF used for the joint limits")
   parser.add_argument("--no-clear", action="store_true", help="do not clear the screen between refreshes")
   args = parser.parse_args()
-  # Sim is the default; the real robot needs an explicit --iface enp43s0.
+  # Sim is the default; the real robot needs an explicit --network enp43s0.
   if args.domain is None:
     args.domain = 1 if args.iface == "lo" else 0
-  print(f"DDS: {'SIM' if args.iface == 'lo' else 'REAL ROBOT'} | iface {args.iface} | domain {args.domain}", flush=True)
+  print(f"DDS: {'SIM' if args.iface == 'lo' else 'REAL ROBOT'} | network {args.iface} | domain {args.domain}", flush=True)
 
   limits = load_joint_limits(args.mjcf)
   missing = [n for n in G1_23DOF_JOINTS.values() if n not in limits]

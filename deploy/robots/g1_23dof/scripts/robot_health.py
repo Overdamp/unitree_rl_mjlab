@@ -11,9 +11,9 @@ Listens for a few seconds and reports, each with PASS / WARN / FAIL:
 
 Never publishes rt/lowcmd and never changes the mode.
 
-  python deploy/robots/g1_23dof/scripts/robot_health.py --iface enp43s0              # real robot
+  python deploy/robots/g1_23dof/scripts/robot_health.py --network enp43s0              # real robot
   python deploy/robots/g1_23dof/scripts/robot_health.py                              # sim (default lo, domain 1)
-  python deploy/robots/g1_23dof/scripts/robot_health.py --iface enp43s0 --seconds 5
+  python deploy/robots/g1_23dof/scripts/robot_health.py --network enp43s0 --seconds 5
 """
 
 import argparse
@@ -39,14 +39,15 @@ def line(status: str, text: str) -> str:
 
 def main() -> int:
   parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-  parser.add_argument("--iface", default="lo", help="lo = sim (default), enp43s0 = real robot (say it explicitly)")
+  parser.add_argument("--network", "--iface", dest="iface", default="lo",
+                      help="DDS interface like g1_ctrl --network: lo = sim (default), enp43s0 = real robot (say it explicitly); --iface = old name")
   parser.add_argument("--domain", type=int, default=None, help="default: 1 on lo (sim), 0 otherwise (real robot)")
   parser.add_argument("--seconds", type=float, default=3.0, help="listening time")
   args = parser.parse_args()
-  # Sim is the default; the real robot needs an explicit --iface enp43s0.
+  # Sim is the default; the real robot needs an explicit --network enp43s0.
   if args.domain is None:
     args.domain = 1 if args.iface == "lo" else 0
-  print(f"DDS: {'SIM' if args.iface == 'lo' else 'REAL ROBOT'} | iface {args.iface} | domain {args.domain}", flush=True)
+  print(f"DDS: {'SIM' if args.iface == 'lo' else 'REAL ROBOT'} | network {args.iface} | domain {args.domain}", flush=True)
 
   from unitree_sdk2py.comm.motion_switcher.motion_switcher_client import MotionSwitcherClient
   from unitree_sdk2py.core.channel import ChannelFactoryInitialize, ChannelSubscriber

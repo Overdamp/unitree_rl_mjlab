@@ -62,8 +62,8 @@ projected gravity = (2(wy−xz), −2(wx+yz), −(w²−x²−y²+z²))
 conda activate g1_sdk
 cd ~/nvidia/unitree/unitree_rl_mjlab
 T=$(date +%Y%m%d_%H%M)
-python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --iface enp43s0 --log ~/g1_state_$T.csv
-python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py   --iface enp43s0 --log ~/g1_cmd_$T.csv
+python deploy/robots/g1_23dof/scripts/lowstate_monitor.py --network enp43s0 --log ~/g1_state_$T.csv
+python deploy/robots/g1_23dof/scripts/lowcmd_monitor.py   --network enp43s0 --log ~/g1_cmd_$T.csv
 python deploy/robots/g1_23dof/scripts/pd_check.py ~/g1_state_$T.csv ~/g1_cmd_$T.csv
 ```
 
