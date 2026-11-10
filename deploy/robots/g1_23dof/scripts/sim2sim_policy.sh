@@ -18,6 +18,7 @@
 # In MuJoCo: Pause, load key 0 (stand_ready); in the g1_ctrl pane press u then v;
 # Run MuJoCo; then w / q / e / a / d / x in the g1_ctrl pane.
 # Mouse is on: click a pane to type in it. Ctrl+b then z zooms a pane.
+# From a normal terminal it attaches by itself; NO_ATTACH=1 only starts it.
 # Done: tmux kill-session -t sim2sim
 set -euo pipefail
 
@@ -65,4 +66,10 @@ tmux select-pane -t "${P_SIM}" -T "unitree_mujoco (log; the picture is its own w
 tmux select-pane -t "${P_SPEED}" -T "sim_speed_monitor"
 tmux select-pane -t "${P_CTRL}" -T "g1_ctrl ${POLICY} (keys here: u v w a s d q e x p)"
 tmux select-pane -t "${P_CTRL}"   # -T only renames; this makes it the active pane
-echo "Policy ${POLICY}, scratch copy in ${WORK}. Attach with: tmux attach -t ${SESSION}"
+echo "Policy ${POLICY}, scratch copy in ${WORK}."
+# Attach straight away from a normal terminal (like deploy_byobu.sh). Not from
+# inside tmux (that would nest) or without a terminal (scripts, NO_ATTACH=1).
+if [ -z "${TMUX:-}" ] && [ -t 0 ] && [ -t 1 ] && [ -z "${NO_ATTACH:-}" ]; then
+  exec tmux attach -t "${SESSION}"
+fi
+echo "Attach with: tmux attach -t ${SESSION}   (or, inside tmux: tmux switch-client -t ${SESSION})"
