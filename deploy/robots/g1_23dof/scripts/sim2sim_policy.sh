@@ -25,7 +25,7 @@ set -euo pipefail
 POLICY="${1:?usage: $0 <folder under config/policy/velocity>}"
 ROBOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_ROOT="$(cd "${ROBOT_DIR}/../../.." && pwd)"
-WORK="${WORK:-/tmp/g1_sim2sim_${POLICY}}"
+WORK="${WORK:-/tmp/g1_sim2sim_${USER:-$(id -un)}_${POLICY}}"   # per user: /tmp is shared
 SESSION="${SESSION:-sim2sim}"
 PY="${PY:-$HOME/miniconda3/envs/g1_sdk/bin/python}"
 
