@@ -14,7 +14,10 @@ from .env_cfgs import unitree_g1_23dof_rough_blind_env_cfg
 from .terrains_stairs import OpenRiserStairsTerrainCfg
 
 # Placeholders until the target staircase is measured (plan step 0).
-OPEN_STAIRS_RISE = (0.05, 0.18)
+# The rise starts at 2 cm: the flat-trained P3b already falls on 86% of 3 cm
+# steps going up (step-2 baseline), so the easiest curriculum row must be
+# lower than that for the terrain curriculum to get going.
+OPEN_STAIRS_RISE = (0.02, 0.18)
 OPEN_STAIRS_TREAD = (0.25, 0.32)
 OPEN_STAIRS_THICKNESS = (0.03, 0.06)
 OPEN_STAIRS_NOSING = (0.0, 0.03)
