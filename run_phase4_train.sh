@@ -6,6 +6,9 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
+# The conda env has the main checkout pip-installed (editable); without this,
+# `import src` loads the MAIN folder's code even when run from a worktree.
+export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 
 # The resume run must live under logs/. On machines without the original P3b
 # run (e.g. the DGX), seed it from the checkpoint committed in the repo.

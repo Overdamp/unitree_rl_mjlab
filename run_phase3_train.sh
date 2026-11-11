@@ -3,6 +3,9 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
+# The conda env has the main checkout pip-installed (editable); without this,
+# `import src` loads the MAIN folder's code even when run from a worktree.
+export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 python scripts/train.py Unitree-G1-23Dof-Flat \
   --env.scene.num-envs=1024 \
   --agent.resume=True \
