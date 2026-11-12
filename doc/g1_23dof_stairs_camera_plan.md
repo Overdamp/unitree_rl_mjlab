@@ -2,6 +2,17 @@
 
 เขียน 11/11/2026 · ต่อจาก `g1_23dof_stairs_plan.md` · branch `phase4-stairs` · ทำใน sim ทั้งหมดจนถึงช่วง D
 
+## สถานะ 12/11/2026
+
+- ใช้ **กล้อง depth อย่างเดียว** ก่อน (ตัด lidar ออกจากรอบนี้ MID-360 ถูกถอดจากหุ่นแล้ว)
+- Teacher พร้อม: task `Unitree-G1-23Dof-OpenStairs-Teacher` + `run_stairs_teacher_train.sh`
+- Student แบบ depth พร้อม: task `Unitree-G1-23Dof-OpenStairs-Depth` + `run_stairs_depth_train.sh`
+  - **เปลี่ยนแนวทางรอบแรก:** เทรน student ด้วย PPO โดยตรง (actor เห็น depth, critic เห็น height scan) แทน distillation เพราะ mjlab ไม่มี config ของ distillation ให้ใช้ และวิธีนี้ไม่ต้องรอ teacher จึงเทรนคู่กันได้ · ถ้า student ตามไม่ทัน teacher ค่อยทำ distillation (B7)
+  - กล้อง: ray cast แบบ pinhole 40 × 24 จุด, fovy 58° (แนวนอน ~85°), 0.4–3.0 m, noise ∝ ระยะ², pixel หาย 2%, หน่วง 1–3 step (20–60 ms), ซ้อน 3 เฟรมเป็น channel ของ CNN · โค้ด `config/g1_23dof/depth_camera.py`
+  - ตำแหน่งกล้องเป็นค่าชั่วคราวจาก URDF ของ Unitree (d435_link: สูง 0.43 m เหนือ torso_link ก้ม 47.6°) ภาพล่างสุดเห็นพื้นห่างเท้า ~0.3 m ขั้นใต้เท้าอยู่นอกภาพ
+  - ตรวจแล้ว: เทรน 64 envs × 3 iteration ผ่าน, export ONNX ได้, เปิดดูภาพ depth 4 envs เห็นพื้นและขอบขั้น แถวบน = ไกล
+  - ยังไม่ทำ: สุ่มตำแหน่ง/มุมกล้องต่อ episode, อัตราภาพ 30 Hz, deploy ฝั่ง C++ ที่รับภาพ
+
 ## ทำไมต้องใช้กล้อง
 
 ผลวัดขั้น 2b (`doc/g1_23dof_stairs_results/step2b_stairs_blind_vx0.5.jsonl`, vx 0.5, 64 ตัวต่อกรณี):

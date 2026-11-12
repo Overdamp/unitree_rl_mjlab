@@ -44,3 +44,33 @@ def unitree_g1_23dof_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
     num_steps_per_env=24,
     max_iterations=10001,
   )
+
+
+def unitree_g1_23dof_depth_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+  """Stairs student (depth camera): CNN actor on (actor, depth), MLP critic on
+  the privileged critic group. Same PPO settings as the blind policy."""
+  cfg = unitree_g1_23dof_ppo_runner_cfg()
+  cfg.actor = RslRlModelCfg(
+    hidden_dims=(512, 256, 128),
+    activation="elu",
+    obs_normalization=True,
+    class_name="CNNModel",
+    cnn_cfg={
+      # Input 3 x 24 x 40 -> 16 x 10 x 18 -> 32 x 4 x 8 -> 32 x 2 x 6, flattened (384).
+      "output_channels": [16, 32, 32],
+      "kernel_size": [5, 3, 3],
+      "stride": [2, 2, 1],
+      "padding": "none",
+      "activation": "elu",
+      "max_pool": False,
+      "global_pool": "none",
+      "flatten": True,
+    },
+    distribution_cfg={
+      "class_name": "GaussianDistribution",
+      "init_std": 1.0,
+      "std_type": "scalar",
+    },
+  )
+  cfg.obs_groups = {"actor": ("actor", "depth"), "critic": ("critic",)}
+  return cfg

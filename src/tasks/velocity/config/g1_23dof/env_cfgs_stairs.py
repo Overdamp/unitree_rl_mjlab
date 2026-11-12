@@ -8,12 +8,18 @@ blind checkpoints play on it unchanged; that is the step-2 baseline.
 from dataclasses import replace
 
 from mjlab.envs import ManagerBasedRlEnvCfg
+from mjlab.managers.observation_manager import (
+  ObservationGroupCfg,
+  ObservationTermCfg,
+)
+from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
 from mjlab.terrains import BoxFlatTerrainCfg
 
 from .env_cfgs import (
   unitree_g1_23dof_rough_blind_env_cfg,
   unitree_g1_23dof_rough_env_cfg,
 )
+from .depth_camera import d455_sensor_cfg, depth_image, get_spec_with_d455
 from .terrains_stairs import OpenRiserStairsTerrainCfg
 
 # Placeholders until the target staircase is measured (plan step 0).
@@ -73,5 +79,70 @@ def unitree_g1_23dof_open_stairs_teacher_env_cfg(
   assert terrain_gen is not None
   cfg.scene.terrain.terrain_generator = replace(
     terrain_gen, sub_terrains=open_stairs_sub_terrains()
+  )
+
+  # Fixes after the first teacher run (12/11, iteration 2428: tracking 0.47,
+  # error_vel_xy 1.03 m/s, terrain_levels 0.08), the same changes that made
+  # Rough-Blind track:
+  # 1. Start every env on the easiest rows (the base config spreads them over
+  #    rows 0-5, so a robot that cannot walk yet is demoted from row 5 at once).
+  cfg.scene.terrain.max_init_terrain_level = 1
+  # 2. Double the linear tracking reward: standing still was paying too well.
+  cfg.rewards["track_linear_velocity"].weight = 2.0
+  # 3. One command stage inside what deploy can send (vx -0.5..1.0). The base
+  #    curriculum widens vx to -1..2 m/s after 5000 iterations, and its step
+  #    counter restarts on resume, so it would fire 5000 iterations later.
+  stage = {
+    "step": 0,
+    "lin_vel_x": (-0.5, 1.0),
+    "lin_vel_y": (-0.5, 0.5),
+    "ang_vel_z": (-1.0, 1.0),
+  }
+  if "command_vel" in cfg.curriculum:
+    cfg.curriculum["command_vel"].params["velocity_stages"] = [stage]
+  twist_cmd = cfg.commands["twist"]
+  assert isinstance(twist_cmd, UniformVelocityCommandCfg)
+  twist_cmd.ranges.lin_vel_x = stage["lin_vel_x"]
+  twist_cmd.ranges.lin_vel_y = stage["lin_vel_y"]
+  return cfg
+
+
+# Depth frames stacked as CNN channels (current + 2 past): the step under the
+# feet leaves the image, so the policy needs a short memory of it.
+DEPTH_HISTORY = 3
+# Camera latency in policy steps (20 ms each): D455 + transport ~20-60 ms.
+DEPTH_DELAY_STEPS = (1, 3)
+
+
+def unitree_g1_23dof_open_stairs_depth_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Student for camera plan part B (depth only): open-riser stairs where the
+  actor sees proprioception (80) + a simulated head D455 depth image, and the
+  critic keeps the privileged height scan (asymmetric actor-critic, PPO).
+  Observation groups: actor (80), depth (3 x 24 x 40), critic (95 + 187).
+  """
+  cfg = unitree_g1_23dof_open_stairs_teacher_env_cfg(play=play)
+
+  robot = cfg.scene.entities["robot"]
+  cfg.scene.entities["robot"] = replace(robot, spec_fn=get_spec_with_d455)
+  cam = d455_sensor_cfg()
+  cfg.scene.sensors = (cfg.scene.sensors or ()) + (cam,)
+
+  # The real robot has no height scan: the actor loses it, the critic keeps it.
+  del cfg.observations["actor"].terms["height_scan"]
+  cfg.observations["depth"] = ObservationGroupCfg(
+    terms={
+      "depth_image": ObservationTermCfg(
+        func=depth_image,
+        params={"sensor_name": cam.name},
+        delay_min_lag=DEPTH_DELAY_STEPS[0],
+        delay_max_lag=DEPTH_DELAY_STEPS[1],
+        history_length=DEPTH_HISTORY,
+        flatten_history_dim=False,
+      )
+    },
+    enable_corruption=False,
+    concatenate_terms=True,
   )
   return cfg
