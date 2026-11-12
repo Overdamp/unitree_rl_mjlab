@@ -23,7 +23,8 @@ if [ -z "$LOAD_RUN" ] || [ ! -d "$LOGS/$LOAD_RUN" ]; then
   echo "No teacher run found under $LOGS (set LOAD_RUN=...)" >&2
   exit 1
 fi
-CKPT="${CKPT:-$(ls "$LOGS/$LOAD_RUN"/model_*.pt | sort -t_ -k2 -n | tail -n 1 | xargs -n1 basename)}"
+# Sort bare file names by number (the full path has underscores of its own).
+CKPT="${CKPT:-$(ls "$LOGS/$LOAD_RUN" | grep -E '^model_[0-9]+\.pt$' | sort -V | tail -n 1)}"
 START="${CKPT//[!0-9]/}"
 # Finish at iteration 8000 overall, like the first run planned.
 ITERS=$(( 8000 - START ))
