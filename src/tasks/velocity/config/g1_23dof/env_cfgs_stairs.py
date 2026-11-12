@@ -10,7 +10,10 @@ from dataclasses import replace
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.terrains import BoxFlatTerrainCfg
 
-from .env_cfgs import unitree_g1_23dof_rough_blind_env_cfg
+from .env_cfgs import (
+  unitree_g1_23dof_rough_blind_env_cfg,
+  unitree_g1_23dof_rough_env_cfg,
+)
 from .terrains_stairs import OpenRiserStairsTerrainCfg
 
 # Placeholders until the target staircase is measured (plan step 0).
@@ -44,6 +47,26 @@ def unitree_g1_23dof_open_stairs_blind_env_cfg(
 ) -> ManagerBasedRlEnvCfg:
   """Blind G1-23DoF on open-riser stairs (pyramid = down, bowl = up)."""
   cfg = unitree_g1_23dof_rough_blind_env_cfg(play=play)
+
+  assert cfg.scene.terrain is not None
+  terrain_gen = cfg.scene.terrain.terrain_generator
+  assert terrain_gen is not None
+  cfg.scene.terrain.terrain_generator = replace(
+    terrain_gen, sub_terrains=open_stairs_sub_terrains()
+  )
+  return cfg
+
+
+def unitree_g1_23dof_open_stairs_teacher_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Teacher for doc/g1_23dof_stairs_camera_plan.md part A: open-riser stairs
+  with the privileged height scan (terrain_scan, 17 x 11 rays under the pelvis)
+  in actor and critic. The real robot has no such scan; the student (depth
+  camera + lidar) learns from this teacher. Actor obs = 80 + 187, so it trains
+  from scratch (P3b checkpoints do not load).
+  """
+  cfg = unitree_g1_23dof_rough_env_cfg(play=play)
 
   assert cfg.scene.terrain is not None
   terrain_gen = cfg.scene.terrain.terrain_generator

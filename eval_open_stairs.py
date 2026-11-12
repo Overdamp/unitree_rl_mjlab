@@ -59,7 +59,7 @@ def run_case(args) -> dict:
   device = "cuda:0" if torch.cuda.is_available() else "cpu"
   up = args.direction == "up"
 
-  cfg = load_env_cfg(TASK, play=True)
+  cfg = load_env_cfg(args.task, play=True)
   cfg.scene.num_envs = args.num_envs
   gen = cfg.scene.terrain.terrain_generator
   cfg.scene.terrain.terrain_generator = replace(
@@ -97,11 +97,11 @@ def run_case(args) -> dict:
   twist.ranges.ang_vel_z = (0.0, 0.0)
   twist.ranges.heading = (0.0, 0.0)
 
-  agent_cfg = load_rl_cfg(TASK)
+  agent_cfg = load_rl_cfg(args.task)
   env = RslRlVecEnvWrapper(
     ManagerBasedRlEnv(cfg=cfg, device=device), clip_actions=agent_cfg.clip_actions
   )
-  runner_cls = load_runner_cls(TASK) or MjlabOnPolicyRunner
+  runner_cls = load_runner_cls(args.task) or MjlabOnPolicyRunner
   runner = runner_cls(env, asdict(agent_cfg), device=device)
   runner.load(args.checkpoint, load_cfg={"actor": True}, strict=True, map_location=device)
   policy = runner.get_inference_policy(device=device)
@@ -151,12 +151,14 @@ def run_case(args) -> dict:
     "x_mean_m": round(last[:, 0].mean().item(), 2),
     "x_end_stairs_m": STAIRS_END,
     "checkpoint": Path(args.checkpoint).name,
+    "task": args.task,
   }
 
 
 def main():
   ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
   ap.add_argument("--checkpoint", default=P3B)
+  ap.add_argument("--task", default=TASK, help="task whose obs match the checkpoint (e.g. ...-OpenStairs-Teacher)")
   ap.add_argument("--rises", default="0.0,0.03,0.05,0.08,0.10,0.12,0.15,0.18", help="sweep: rises in m")
   ap.add_argument("--directions", default="down,up")
   ap.add_argument("--rise", type=float, help="run ONE case and print a JSON line")
@@ -177,7 +179,7 @@ def main():
   for direction in args.directions.split(","):
     for rise in (float(r) for r in args.rises.split(",")):
       cmd = [sys.executable, __file__, "--rise", str(rise), "--direction", direction,
-             "--checkpoint", args.checkpoint, "--vx", str(args.vx),
+             "--checkpoint", args.checkpoint, "--task", args.task, "--vx", str(args.vx),
              "--num-envs", str(args.num_envs), "--seconds", str(args.seconds)]
       p = subprocess.run(cmd, capture_output=True, text=True)
       line = next((ln for ln in p.stdout.splitlines() if ln.startswith("RESULT ")), None)

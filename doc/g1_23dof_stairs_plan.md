@@ -21,8 +21,8 @@
 | 0 | วัดบันไดเป้าหมาย (สูงขั้น ลึกขั้น ความหนาแผ่น จมูกยื่น ช่องว่าง) และตำแหน่ง/มุมกล้อง | ไม่ (ใช้ตลับเมตร) | ยังไม่ทำ |
 | 1 | สร้าง terrain บันไดโปร่งใน `src/tasks/velocity/config/g1_23dof/` | ไม่ | เสร็จ 6/11 (task `Unitree-G1-23Dof-OpenStairs-Blind`) |
 | 2 | Baseline: วัดว่า policy blind เดินบนบันไดโปร่งได้สูงสุดกี่ cm | ไม่ | เสร็จ 11/11 สำหรับ P3b (ยังไม่มี `Rough-Blind` ที่เทรนเสร็จให้วัด) |
-| 2b | Fine-tune แบบ blind บนบันไดโปร่ง (resume P3b, `run_stairs_blind_train.sh`, 4000 iteration) แล้ววัดด้วย `eval_open_stairs.py` · บอกว่า blind ไปได้ไกลแค่ไหน และเป็น baseline ที่ teacher ต้องชนะ | ไม่ | สคริปต์พร้อม 11/11 รอเทรนบน DGX |
-| 3 | Teacher: เทรนด้วย `height_scan` แบบ privileged | ไม่ | ยังไม่ทำ |
+| 2b | Fine-tune แบบ blind บนบันไดโปร่ง (resume P3b, `run_stairs_blind_train.sh`, 4000 iteration) แล้ววัดด้วย `eval_open_stairs.py` · บอกว่า blind ไปได้ไกลแค่ไหน และเป็น baseline ที่ teacher ต้องชนะ | ไม่ | เสร็จ 11/11: ขึ้นได้ถึง ~5 cm (44% ที่ 5 cm, 0% ตั้งแต่ 8 cm) และเดินช้าลง ไม่ใช้แทน P3b · ผลดิบ `step2b_stairs_blind_vx0.5.jsonl` |
+| 3 | Teacher: เทรนด้วย `height_scan` แบบ privileged | ไม่ | task `OpenStairs-Teacher` + `run_stairs_teacher_train.sh` พร้อม 12/11 · แผนละเอียด: `g1_23dof_stairs_camera_plan.md` |
 | 4 | Student: depth จาก `PinholeCameraPatternCfg` ตั้งค่าตาม D455 (noise, latency, ตัดระยะใกล้) + GRU แล้ว distill จาก teacher | ไม่ | ยังไม่ทำ |
 | 5 | อ่านภาพ D455 จริงแบบอ่านอย่างเดียว เทียบกับภาพจำลอง วัด latency | อ่านอย่างเดียว | ยังไม่ทำ |
 | 6 | ทดสอบบนหุ่น | ใช่ | รอให้เดินพื้นเรียบผ่านก่อน |
