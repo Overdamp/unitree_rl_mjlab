@@ -7,9 +7,16 @@ concatenated oldest -> newest like the deploy ObservationManager), 50 Hz policy,
 PD on 500 Hz physics, joints the policy does not drive held with FixStand gains.
 No DDS latency is simulated.
 
+Per case it also reports efficiency and hardware load over the measure window:
+mechanical power and cost of transport (CoT = mean sum|tau * qdot| / (m g v)),
+peak and RMS torque per joint against the effort limit, and the share of time a
+motor sat at its torque limit. --push sweeps base velocity kicks (like the
+training push_robot event) and reports the largest kick survived per direction.
+
   python deploy/robots/g1_23dof/scripts/vel_eval.py \
     --policy deploy/robots/g1_23dof/config/policy/velocity/v0/exported/policy_phase3b_16000.onnx \
     --deploy deploy/robots/g1_23dof/config/policy/velocity/v0/params/deploy.yaml
+  python .../vel_eval.py --policy ... --deploy ... --cases "0.4,0,0;0,0,0" --push
 """
 
 import argparse
@@ -40,6 +47,11 @@ DEFAULT_CASES = [
 ]
 FALL_TILT = 0.85  # rad
 HANG_HEIGHT = 1.3  # m, feet clear of the ground
+G = 9.81
+# Push sweep: base velocity kicks (m/s) applied once, 1 s into the measure window.
+PUSH_DIRS = {"front": (1.0, 0.0), "back": (-1.0, 0.0), "left": (0.0, 1.0), "right": (0.0, -1.0)}
+PUSH_LEVELS = (0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0)
+PUSH_AT = 1.0  # s after the measure window starts
 # Motor velocity limits in rad/s (src/assets/robots/unitree_g1/g1_23dof_constants.py).
 VEL_LIMITS = [
   (r".*_(hip_roll|knee)_joint", 20.0),
@@ -83,6 +95,7 @@ class Sim:
     self.names = [m.joint(j).name for j in jids]
     self.jrange = np.array([m.jnt_range[j] for j in jids])
     self.vlim = np.array([next(v for p, v in VEL_LIMITS if re.fullmatch(p, n)) for n in self.names])
+    self.mass = float(np.sum(m.body_mass))
 
     # Full 29-motor targets: FixStand pose/gains, policy joints overwritten.
     self.kp = np.array(fsm["FixStand"]["kp"], float)
@@ -109,7 +122,8 @@ class Sim:
     }
     return {k: raw[k] * self.obs_scale[k] if self.obs_scale[k] is not None else raw[k] for k in self.terms}
 
-  def run(self, sess, cmd_target, settle=2.0, walk=12.0, measure=8.0, smooth=True, hang=False):
+  def run(self, sess, cmd_target, settle=2.0, walk=12.0, measure=8.0, smooth=True, hang=False, push=None):
+    """push: (dvx, dvy) in m/s, world frame, added to the base velocity once."""
     m, d = self.m, self.d
     iname = sess.get_inputs()[0].name
     mujoco.mj_resetData(m, d)
@@ -137,6 +151,10 @@ class Sim:
       entry_jump=0.0, target_out=0, target_over=np.zeros(n), q_margin=np.full(n, np.inf),
       speed_ratio=np.zeros(n), tau_ratio=np.zeros(n), steps=0,
     )
+    # Measure-window load, all 29 motors for power, policy joints for torque.
+    energy, meas_t = 0.0, 0.0
+    tau_peak, tau_sq, tau_sat, n_sub = np.zeros(n), np.zeros(n), np.zeros(n), 0
+    k_push = n_meas0 + int(PUSH_AT / self.dt) if push is not None else -1
     for k in range(n_total):
       target = np.array(cmd_target) if k >= n_settle else np.zeros(3)
       # g1_ctrl smooths keyboard commands; the real gamepad stick goes straight in.
@@ -158,6 +176,9 @@ class Sim:
       safety["target_out"] += int(np.sum(over > 0))
       safety["target_over"] = np.maximum(safety["target_over"], over)
       safety["steps"] += 1
+      if k == k_push:
+        d.qvel[0] += push[0]
+        d.qvel[1] += push[1]
       for _ in range(self.dec):
         if hang:  # gantry: base held in the air, feet off the ground
           d.qpos[0:3] = (0.0, 0.0, HANG_HEIGHT)
@@ -170,6 +191,14 @@ class Sim:
         safety["q_margin"] = np.minimum(safety["q_margin"], np.minimum(qj - lo, hi - qj))
         safety["speed_ratio"] = np.maximum(safety["speed_ratio"], np.abs(d.qvel[self.vadr[self.ids]]) / self.vlim)
         safety["tau_ratio"] = np.maximum(safety["tau_ratio"], np.abs(d.ctrl[self.ids]) / self.hi[self.ids])
+        if k >= n_meas0:
+          energy += float(np.sum(np.abs(d.ctrl * d.qvel[self.vadr]))) * m.opt.timestep
+          meas_t += m.opt.timestep
+          tj = np.abs(d.ctrl[self.ids])
+          tau_peak = np.maximum(tau_peak, tj)
+          tau_sq += tj * tj
+          tau_sat += tj >= 0.99 * self.hi[self.ids]
+          n_sub += 1
       R = quat_rot(d.qpos[3:7])
       tilt = np.arccos(np.clip(-(R.T @ np.array([0, 0, -1.0]))[2], -1, 1))
       tilt_max = max(tilt_max, tilt)
@@ -191,6 +220,26 @@ class Sim:
       i = int(fn(a))
       return [self.names[i].removesuffix("_joint"), round(float(a[i]), 3)]
 
+    power = energy / meas_t if meas_t > 0 else None
+    speed = float(np.hypot(np.mean(vx), np.mean(vy))) if vx else 0.0
+    if n_sub:
+      lim = self.hi[self.ids]
+      tau_rms = np.sqrt(tau_sq / n_sub)
+      load = dict(
+        # Mechanical power, sum |tau * qdot| over all motors (W). Upper bound of
+        # battery draw minus electrical losses, which this does not model.
+        power_w=round(power, 1),
+        # Dimensionless; only meaningful when the robot actually travels.
+        cot=round(power / (self.mass * G * speed), 3) if speed >= 0.1 else None,
+        peak_torque_nm=worst(tau_peak),
+        peak_torque_ratio=worst(tau_peak / lim),
+        rms_torque_ratio=worst(tau_rms / lim),
+        # Share of physics steps a joint spent at >= 99% of its torque limit.
+        torque_sat_pct=worst(100.0 * tau_sat / n_sub) if tau_sat.any() else 0.0,
+      )
+    else:
+      load = None
+
     return dict(
       cmd=list(cmd_target),
       fell=fell,
@@ -202,6 +251,7 @@ class Sim:
       # Sway over the measure window; at cmd = 0 a still stance gives ~0 for both.
       joint_vel_std=round(float(np.mean(np.std(jv, axis=0))), 3) if jv else None,
       yaw_rate_std=round(float(np.std(wz)), 3) if wz else None,
+      load=load,
       safety=dict(
         # Largest |target - default pose| on the first policy step after entering Velocity.
         entry_jump_rad=round(safety["entry_jump"], 3),
@@ -222,6 +272,7 @@ def main():
   parser.add_argument("--cases", type=str, default=None, help="'vx,vy,wz;vx,vy,wz' (default: built-in set)")
   parser.add_argument("--no-smooth", action="store_true", help="step commands like the real gamepad (no 0.15 smoothing)")
   parser.add_argument("--hang", action="store_true", help="hold the base in the air like the gantry (use --cases 0,0,0)")
+  parser.add_argument("--push", action="store_true", help="per case, sweep base kicks front/back/left/right until it falls")
   args = parser.parse_args()
 
   sim = Sim(args.deploy)
@@ -234,7 +285,19 @@ def main():
   if args.cases:
     cases = [tuple(float(x) for x in c.split(",")) for c in args.cases.split(";")]
   for c in cases:
-    r = sim.run(sess, c, smooth=not args.no_smooth, hang=args.hang)
+    if args.push:
+      # Largest kick survived per direction; levels stop at the first fall.
+      res = {}
+      for name, (ux, uy) in PUSH_DIRS.items():
+        ok = 0.0
+        for lv in PUSH_LEVELS:
+          if sim.run(sess, c, smooth=not args.no_smooth, push=(ux * lv, uy * lv))["fell"]:
+            break
+          ok = lv
+        res[name] = ok
+      r = dict(cmd=list(c), push_max_ok_mps=res, push_levels=list(PUSH_LEVELS))
+    else:
+      r = sim.run(sess, c, smooth=not args.no_smooth, hang=args.hang)
     r["policy"] = args.policy.name
     print(json.dumps(r), flush=True)
 

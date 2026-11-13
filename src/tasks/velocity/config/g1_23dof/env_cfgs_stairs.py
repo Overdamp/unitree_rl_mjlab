@@ -20,6 +20,7 @@ from .env_cfgs import (
   unitree_g1_23dof_rough_env_cfg,
 )
 from .depth_camera import d455_sensor_cfg, depth_image, get_spec_with_d455
+from .rewards_stairs import feet_clearance_terrain, foot_ground_ray_cfgs
 from .terrains_stairs import OpenRiserStairsTerrainCfg
 
 # Placeholders until the target staircase is measured (plan step 0).
@@ -104,6 +105,23 @@ def unitree_g1_23dof_open_stairs_teacher_env_cfg(
   assert isinstance(twist_cmd, UniformVelocityCommandCfg)
   twist_cmd.ranges.lin_vel_x = stage["lin_vel_x"]
   twist_cmd.ranges.lin_vel_y = stage["lin_vel_y"]
+
+  # 4. (13/11) Foot clearance from the ground under each foot, not from world
+  #    z = 0: the shared term made every step on a tall pyramid/bowl costly and
+  #    the teacher stopped in front of stairs from 8 cm (rewards_stairs.py).
+  #    Same weight and 0.10 m target; obs unchanged, so checkpoints still load.
+  cfg.scene.sensors = (cfg.scene.sensors or ()) + foot_ground_ray_cfgs()
+  clearance = cfg.rewards["foot_clearance"]
+  cfg.rewards["foot_clearance"] = replace(
+    clearance,
+    func=feet_clearance_terrain,
+    params={
+      "target_height": clearance.params["target_height"],
+      "command_name": clearance.params["command_name"],
+      "command_threshold": clearance.params["command_threshold"],
+      "asset_cfg": clearance.params["asset_cfg"],
+    },
+  )
   return cfg
 
 

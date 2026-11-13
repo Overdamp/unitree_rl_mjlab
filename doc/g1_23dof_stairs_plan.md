@@ -22,7 +22,7 @@
 | 1 | สร้าง terrain บันไดโปร่งใน `src/tasks/velocity/config/g1_23dof/` | ไม่ | เสร็จ 6/11 (task `Unitree-G1-23Dof-OpenStairs-Blind`) |
 | 2 | Baseline: วัดว่า policy blind เดินบนบันไดโปร่งได้สูงสุดกี่ cm | ไม่ | เสร็จ 11/11 สำหรับ P3b (ยังไม่มี `Rough-Blind` ที่เทรนเสร็จให้วัด) |
 | 2b | Fine-tune แบบ blind บนบันไดโปร่ง (resume P3b, `run_stairs_blind_train.sh`, 4000 iteration) แล้ววัดด้วย `eval_open_stairs.py` · บอกว่า blind ไปได้ไกลแค่ไหน และเป็น baseline ที่ teacher ต้องชนะ | ไม่ | เสร็จ 11/11: ขึ้นได้ถึง ~5 cm (44% ที่ 5 cm, 0% ตั้งแต่ 8 cm) และเดินช้าลง ไม่ใช้แทน P3b · ผลดิบ `step2b_stairs_blind_vx0.5.jsonl` |
-| 3 | Teacher: เทรนด้วย `height_scan` แบบ privileged | ไม่ | task `OpenStairs-Teacher` + `run_stairs_teacher_train.sh` พร้อม 12/11 · แผนละเอียด: `g1_23dof_stairs_camera_plan.md` |
+| 3 | Teacher: เทรนด้วย `height_scan` แบบ privileged | ไม่ | เทรนแล้ว 13/11 (`stairs_teacher2` model_7999) **ไม่ชนะ blind**: ลงได้ถึง 5 cm (94–100%) แต่ตั้งแต่ 8 cm หยุดยืนหน้าขอบ (0% ผ่าน 0% ล้ม) ขึ้นได้ 45% ที่ 5 cm · ต้องแก้ reward ก่อน (ดูบันทึกผลขั้น 3) · ผลดิบ `step3_teacher_vx0.5.jsonl` |
 | 4 | Student: depth จาก `PinholeCameraPatternCfg` ตั้งค่าตาม D455 (noise, latency, ตัดระยะใกล้) + GRU แล้ว distill จาก teacher | ไม่ | ยังไม่ทำ |
 | 5 | อ่านภาพ D455 จริงแบบอ่านอย่างเดียว เทียบกับภาพจำลอง วัด latency | อ่านอย่างเดียว | ยังไม่ทำ |
 | 6 | ทดสอบบนหุ่น | ใช่ | รอให้เดินพื้นเรียบผ่านก่อน |
@@ -78,3 +78,24 @@
 - แถว 0 cm (พื้นเรียบ) ล้ม 0–2% ยืนยันว่าตัววัดไม่ได้ทำให้ล้มเอง · ตัวที่ไม่ล้มแต่ไม่ผ่าน น่าจะเดินไม่ถึงปลายทางใน 14 วินาที (P3b เดินได้ช้ากว่าที่สั่ง)
 - ที่ 18 cm ขาขึ้นล้มน้อยลง (69%) เพราะหุ่นติดอยู่หน้าขั้นแรกแทนที่จะล้ม ไม่ได้แปลว่าดีขึ้น
 - ยังไม่ได้เทียบกับบันไดทึบที่ความสูงเท่ากัน จึงยังแยกไม่ได้ว่าส่วนไหนเป็นผลของ "โปร่ง" และส่วนไหนเป็นผลของ "บันได"
+
+### ขั้น 3: teacher (height scan) บนบันไดโปร่ง (13/11/2026)
+`python eval_open_stairs.py --task Unitree-G1-23Dof-OpenStairs-Teacher` · checkpoint `stairs_teacher2/model_7999.pt` (รอบแรก 2428 iteration จากศูนย์ + resume ด้วย config ที่แก้ใน `f395750` จนครบ 8000) · เงื่อนไขเดียวกับขั้น 2/2b · ผลดิบ `doc/g1_23dof_stairs_results/step3_teacher_vx0.5.jsonl`
+
+| สูงขั้น | ลง ผ่าน: teacher / blind 2b | ลง ล้ม: teacher / blind | ขึ้น ผ่าน: teacher / blind | ขึ้น ล้ม: teacher / blind |
+|---|---|---|---|---|
+| 0 cm | 70% / 59% | 0% / 0% | 78% / 66% | 3% / 0% |
+| 3 cm | **100%** / 81% | 0% / 0% | 33% / 23% | 6% / 14% |
+| 5 cm | **94%** / 69% | 0% / 0% | 45% / 44% | 5% / 25% |
+| 8 cm | 0% / 62% | 0% / 20% | 9% / 0% | 14% / 94% |
+| 10 cm | 0% / 55% | 0% / 28% | 0% / 0% | 6% / 86% |
+| 12–18 cm | 0% / 38–50% | 0% / 31–61% | 0% / 0% | 0% / 30–81% |
+
+ตอนเทรน: `terrain_levels` 1.5 → 2.2 แล้วนิ่งตั้งแต่ ~iteration 6600 (≈ ขั้นสูง 5–6 cm) · error_vel_xy ~0.73 m/s · ล้ม ~20%
+
+อ่านผล:
+- **ตั้งแต่ 8 cm teacher หยุดยืนหน้าขอบ** ทั้งขึ้นและลง (ไปได้ 0 ขั้น, x เฉลี่ย 0.4–0.8 m คือยังอยู่บน platform, ไม่ล้ม) ส่วน blind ไม่เห็นขอบจึงเดินลงไปและรอด 38–62% · teacher เห็นด้วย height scan ว่าเป็นพื้นแบบที่ไม่เคยฝึก (curriculum ค้างที่ ~5 cm) แล้วเลือกไม่เสี่ยง เพราะล้ม = −200
+- **ที่ ≤ 5 cm teacher ดีกว่า blind ชัดเจน** โดยเฉพาะลง (94–100% vs 69–81%) และล้มน้อยกว่ามาก
+- **สาเหตุที่น่าจะเป็น (ยังไม่ยืนยัน):** reward `foot_clearance` (`src/tasks/velocity/mdp/rewards.py`) เทียบความสูงเท้ากับ **z = 0.10 m ของโลก** ไม่ใช่กับพื้นใต้เท้า บนบันไดสูง เท้าที่ขยับอยู่ห่าง 0.10 m มาก (pyramid 8 cm: platform สูง 0.64 m · bowl: ก้นลึก −0.56 m) จึงโดนลงโทษตลอดเวลาที่ก้าว ยิ่งด่านสูงยิ่งคุ้มที่จะยืนเฉย → ไม่ผ่านด่าน → curriculum ค้าง
+- แก้แล้ว 13/11: `rewards_stairs.py` `feet_clearance_terrain` ยิง ray ลงจาก ankle roll link ของแต่ละเท้า (เฉพาะ geom ของ terrain) วัดความสูงพื้นรองเท้าเหนือพื้นใต้เท้า น้ำหนักและเป้า 0.10 m เท่าเดิม · ตรวจ: หุ่น 40 ตัวยืนบนบันไดที่สูงถึง 1.5 m วัดได้ −0.003 ถึง 0.097 m · เทรนต่อด้วย `run_stairs_teacher_resume.sh` (resume `stairs_teacher2/model_7999` อีก 5000 iteration เป็น `stairs_teacher3`) · ยังไม่ทำ student จนกว่า teacher จะผ่าน ≥ 80% ที่ 8–10 cm
+
