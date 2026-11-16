@@ -94,7 +94,11 @@ def run_case(args) -> dict:
   twist.resampling_time_range = (1e6, 1e6)
   twist.ranges.lin_vel_x = (args.vx, args.vx)
   twist.ranges.lin_vel_y = (0.0, 0.0)
-  twist.ranges.ang_vel_z = (0.0, 0.0)
+  # Heading 0 is commanded; with ang_vel_z (0, 0) the heading controller's wz
+  # is clipped to zero, so a drifting robot is never steered back (a
+  # policy that does not hold wz = 0 by itself turns away from the stairs).
+  # --heading-hold lets it steer up to +-1 rad/s, like an operator would.
+  twist.ranges.ang_vel_z = (-1.0, 1.0) if args.heading_hold else (0.0, 0.0)
   twist.ranges.heading = (0.0, 0.0)
 
   agent_cfg = load_rl_cfg(args.task)
@@ -149,6 +153,7 @@ def run_case(args) -> dict:
     "steps_mean": round(done_steps.mean().item(), 2),
     "steps_total": total_steps,
     "x_mean_m": round(last[:, 0].mean().item(), 2),
+    "heading_hold": bool(args.heading_hold),
     "x_end_stairs_m": STAIRS_END,
     "checkpoint": Path(args.checkpoint).name,
     "task": args.task,
@@ -166,6 +171,8 @@ def main():
   ap.add_argument("--vx", type=float, default=0.5)
   ap.add_argument("--num-envs", type=int, default=64)
   ap.add_argument("--seconds", type=float, default=14.0)
+  ap.add_argument("--heading-hold", action="store_true",
+                  help="steer back to heading 0 (wz up to +-1 rad/s) instead of commanding wz = 0")
   ap.add_argument("--out", help="sweep: also write the JSON lines to this file")
   args = ap.parse_args()
   os.chdir(ROOT)
@@ -181,6 +188,8 @@ def main():
       cmd = [sys.executable, __file__, "--rise", str(rise), "--direction", direction,
              "--checkpoint", args.checkpoint, "--task", args.task, "--vx", str(args.vx),
              "--num-envs", str(args.num_envs), "--seconds", str(args.seconds)]
+      if args.heading_hold:
+        cmd.append("--heading-hold")
       p = subprocess.run(cmd, capture_output=True, text=True)
       line = next((ln for ln in p.stdout.splitlines() if ln.startswith("RESULT ")), None)
       if line is None:

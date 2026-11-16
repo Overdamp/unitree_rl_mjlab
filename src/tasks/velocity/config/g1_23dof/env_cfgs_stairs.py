@@ -120,8 +120,17 @@ def unitree_g1_23dof_open_stairs_teacher_env_cfg(
       "command_name": clearance.params["command_name"],
       "command_threshold": clearance.params["command_threshold"],
       "asset_cfg": clearance.params["asset_cfg"],
+      # 5. (16/11) Charge only feet below the target: the two-sided cost also
+      #    charged the extra lift needed to step UP (teacher3: down 8 cm
+      #    2% -> 95%, but up 8 cm 31% -> 5%).
+      "below_only": True,
     },
   )
+  # 6. (16/11) Angular tracking as strong as linear: with wz = 0 commanded
+  #    teacher3 turned up to 2.3 rad off course and walked around the stairs
+  #    (error_vel_yaw ~2.5 through teacher2/3; heading control hid it in
+  #    training).
+  cfg.rewards["track_angular_velocity"].weight = 2.0
   return cfg
 
 

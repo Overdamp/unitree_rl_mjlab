@@ -22,7 +22,7 @@
 | 1 | สร้าง terrain บันไดโปร่งใน `src/tasks/velocity/config/g1_23dof/` | ไม่ | เสร็จ 6/11 (task `Unitree-G1-23Dof-OpenStairs-Blind`) |
 | 2 | Baseline: วัดว่า policy blind เดินบนบันไดโปร่งได้สูงสุดกี่ cm | ไม่ | เสร็จ 11/11 สำหรับ P3b (ยังไม่มี `Rough-Blind` ที่เทรนเสร็จให้วัด) |
 | 2b | Fine-tune แบบ blind บนบันไดโปร่ง (resume P3b, `run_stairs_blind_train.sh`, 4000 iteration) แล้ววัดด้วย `eval_open_stairs.py` · บอกว่า blind ไปได้ไกลแค่ไหน และเป็น baseline ที่ teacher ต้องชนะ | ไม่ | เสร็จ 11/11: ขึ้นได้ถึง ~5 cm (44% ที่ 5 cm, 0% ตั้งแต่ 8 cm) และเดินช้าลง ไม่ใช้แทน P3b · ผลดิบ `step2b_stairs_blind_vx0.5.jsonl` |
-| 3 | Teacher: เทรนด้วย `height_scan` แบบ privileged | ไม่ | เทรนแล้ว 13/11 (`stairs_teacher2` model_7999) **ไม่ชนะ blind**: ลงได้ถึง 5 cm (94–100%) แต่ตั้งแต่ 8 cm หยุดยืนหน้าขอบ (0% ผ่าน 0% ล้ม) ขึ้นได้ 45% ที่ 5 cm · ต้องแก้ reward ก่อน (ดูบันทึกผลขั้น 3) · ผลดิบ `step3_teacher_vx0.5.jsonl` |
+| 3 | Teacher: เทรนด้วย `height_scan` แบบ privileged | ไม่ | 16/11 `stairs_teacher3` model_12998: **ลง 8 cm 95%** (teacher2 2%) แต่ขึ้น 8 cm ตกเหลือ 5% (teacher2 31%) · ≥ 10 cm ยังหยุดที่ขอบ · หุ่นหันตัวเองเมื่อสั่ง wz = 0 · กำลังเทรน `stairs_teacher4` (ดูบันทึกผลขั้น 3b) |
 | 4 | Student: depth จาก `PinholeCameraPatternCfg` ตั้งค่าตาม D455 (noise, latency, ตัดระยะใกล้) + GRU แล้ว distill จาก teacher | ไม่ | ยังไม่ทำ |
 | 5 | อ่านภาพ D455 จริงแบบอ่านอย่างเดียว เทียบกับภาพจำลอง วัด latency | อ่านอย่างเดียว | ยังไม่ทำ |
 | 6 | ทดสอบบนหุ่น | ใช่ | รอให้เดินพื้นเรียบผ่านก่อน |
@@ -99,3 +99,26 @@
 - **สาเหตุที่น่าจะเป็น (ยังไม่ยืนยัน):** reward `foot_clearance` (`src/tasks/velocity/mdp/rewards.py`) เทียบความสูงเท้ากับ **z = 0.10 m ของโลก** ไม่ใช่กับพื้นใต้เท้า บนบันไดสูง เท้าที่ขยับอยู่ห่าง 0.10 m มาก (pyramid 8 cm: platform สูง 0.64 m · bowl: ก้นลึก −0.56 m) จึงโดนลงโทษตลอดเวลาที่ก้าว ยิ่งด่านสูงยิ่งคุ้มที่จะยืนเฉย → ไม่ผ่านด่าน → curriculum ค้าง
 - แก้แล้ว 13/11: `rewards_stairs.py` `feet_clearance_terrain` ยิง ray ลงจาก ankle roll link ของแต่ละเท้า (เฉพาะ geom ของ terrain) วัดความสูงพื้นรองเท้าเหนือพื้นใต้เท้า น้ำหนักและเป้า 0.10 m เท่าเดิม · ตรวจ: หุ่น 40 ตัวยืนบนบันไดที่สูงถึง 1.5 m วัดได้ −0.003 ถึง 0.097 m · เทรนต่อด้วย `run_stairs_teacher_resume.sh` (resume `stairs_teacher2/model_7999` อีก 5000 iteration เป็น `stairs_teacher3`) · ยังไม่ทำ student จนกว่า teacher จะผ่าน ≥ 80% ที่ 8–10 cm
 
+### ขั้น 3b: teacher3 (foot clearance เทียบพื้นใต้เท้า) (16/11/2026)
+
+checkpoint `stairs_teacher3/model_12998.pt` (resume teacher2 + `4d163d8` อีก 5000 iteration) · ตอนเทรน `terrain_levels` 2.19 → 2.76, ล้ม ~16%, error_vel_yaw ~2.5 ไม่ลด
+
+**eval แบบเดิม (สั่ง wz = 0) วัดผิดจุด:** หุ่นเดินเร็วตามสั่ง (vx_b ≈ 0.45–0.5) แต่หันตัวเองช้าๆ จน |yaw| ถึง 2.3 rad แล้วเดินอ้อมบันได (ขึ้น 2–3 ขั้นแล้วเลี้ยวลง) · ตอนเทรนคำสั่ง heading ส่ง wz แก้ทิศให้ตลอดจึงไม่เห็น · ใน eval `ang_vel_z = (0, 0)` ทำให้ wz ของ heading ถูก clip เป็น 0 → เพิ่ม `--heading-hold` (ให้แก้ทิศได้ ±1 rad/s แบบคนถือจอย) · ผลดิบ `step3b_teacher3_vx0.5.jsonl` (wz = 0), `*_hold.jsonl` (heading hold)
+
+| สูงขั้น (heading hold) | ลง: teacher2 / teacher3 | ขึ้น: teacher2 / teacher3 | ล้ม teacher3 ขึ้น |
+|---|---|---|---|
+| 0 cm | 92% / 95% | 95% / 97% | 0% |
+| 3 cm | 98% / 100% | 80% / 69% | 11% |
+| 5 cm | 94% / 98% | **92% / 64%** | 2% |
+| 8 cm | **2% / 95%** | **31% / 5%** | 0% |
+| 10 cm | 0% / 11% | 2% / 0% | 0% |
+| 12–18 cm | 0% / 0% | 0% / 0% | 0–2% |
+
+อ่านผล:
+- cost เดิม `|h − 0.10| × ความเร็วเท้า` ลงโทษทั้งต่ำและ**สูง**กว่าเป้า · teacher2 (h เทียบ world z): ใน bowl พื้นติดลบ ยกเท้าสูง = ใกล้ 0.10 = จ่ายน้อย → ช่วยขึ้นโดยบังเอิญ แต่ pyramid ลงโทษทุกก้าว · teacher3 (h เทียบพื้น): ลงหายติด แต่ก้าวขึ้นต้องยกเท้า rise + 10 cm เหนือขั้นล่างก่อนพื้นใต้เท้าจะสูงขึ้น → โดนลงโทษ → ยกต่ำ ขึ้นแย่ลง
+- ≥ 10 cm ทั้งขึ้นและลงยังหยุดที่ขอบ (ไม่ล้ม): curriculum เพิ่งถึง ~7 cm
+
+แก้ 16/11 → `stairs_teacher4` (resume teacher3 อีก 5000 iteration):
+1. `feet_clearance_terrain(below_only=True)`: ลงโทษเฉพาะ `max(0, 0.10 − h)` ยกสูงข้ามขั้นไม่เสีย
+2. `track_angular_velocity` weight 1.0 → 2.0 (เท่า linear) แก้หันตัวเอง
+- เป้า: ≥ 80% ที่ 8–10 cm ทั้งขึ้นและลง ทั้ง eval แบบ wz = 0 และ heading hold

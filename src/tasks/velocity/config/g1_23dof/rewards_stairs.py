@@ -68,15 +68,22 @@ def feet_clearance_terrain(
   command_name: str | None = None,
   command_threshold: float = 0.1,
   asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", site_names=FOOT_SITES),
+  below_only: bool = False,
 ) -> torch.Tensor:
   """Same cost as the shared foot_clearance (|h - target| x foot xy speed),
   with h measured from the ground under the foot instead of from z = 0.
   Over a step edge the ground below rises, so the swing foot must lift above
-  the next tread, not just 10 cm above the floor."""
+  the next tread, not just 10 cm above the floor.
+
+  below_only=True charges only a foot lower than the target,
+  max(0, target - h): stepping UP the swing foot must pass rise + clearance
+  above the lower tread before the ground under it rises, and the two-sided
+  cost charged exactly that lift (teacher3, 16/11: up 8 cm 31% -> 5%)."""
   asset = env.scene[asset_cfg.name]
   foot_vel_xy = asset.data.site_lin_vel_w[:, asset_cfg.site_ids, :2]
   vel_norm = torch.norm(foot_vel_xy, dim=-1)
-  delta = torch.abs(foot_height_above_ground(env) - target_height)
+  diff = target_height - foot_height_above_ground(env)
+  delta = torch.clamp(diff, min=0.0) if below_only else torch.abs(diff)
   cost = torch.sum(delta * vel_norm, dim=1)
   if command_name is not None:
     command = env.command_manager.get_command(command_name)
