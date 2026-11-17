@@ -74,3 +74,12 @@ def unitree_g1_23dof_depth_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
   )
   cfg.obs_groups = {"actor": ("actor", "depth"), "critic": ("critic",)}
   return cfg
+
+
+def unitree_g1_23dof_amp_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+  """Stairs teacher + AMP: same PPO and models, algorithm swapped for AmpPPO
+  (amp_ppo.py). Reference clips come from the AMP_MOTION_FILES env variable."""
+  cfg = unitree_g1_23dof_ppo_runner_cfg()
+  cfg.algorithm.class_name = "src.tasks.velocity.config.g1_23dof.amp_ppo:AmpPPO"
+  cfg.obs_groups = {"actor": ("actor",), "critic": ("critic",)}
+  return cfg

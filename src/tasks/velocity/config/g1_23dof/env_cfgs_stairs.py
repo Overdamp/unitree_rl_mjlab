@@ -19,6 +19,7 @@ from .env_cfgs import (
   unitree_g1_23dof_rough_blind_env_cfg,
   unitree_g1_23dof_rough_env_cfg,
 )
+from .amp_ppo import AMP_OBS_GROUP, amp_state
 from .depth_camera import d455_sensor_cfg, depth_image, get_spec_with_d455
 from .rewards_stairs import feet_clearance_terrain, foot_ground_ray_cfgs
 from .terrains_stairs import OpenRiserStairsTerrainCfg
@@ -179,6 +180,23 @@ def unitree_g1_23dof_open_stairs_depth_env_cfg(
         flatten_history_dim=False,
       )
     },
+    enable_corruption=False,
+    concatenate_terms=True,
+  )
+  return cfg
+
+
+def unitree_g1_23dof_open_stairs_teacher_amp_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Teacher + AMP style reward (amp_ppo.py): the teacher env plus an "amp"
+  observation group (61 features of the current frame, no noise, no history)
+  that only the AMP discriminator reads. Actor and critic obs are unchanged,
+  so teacher checkpoints resume here and the exported policy is the same.
+  """
+  cfg = unitree_g1_23dof_open_stairs_teacher_env_cfg(play=play)
+  cfg.observations[AMP_OBS_GROUP] = ObservationGroupCfg(
+    terms={"amp_state": ObservationTermCfg(func=amp_state)},
     enable_corruption=False,
     concatenate_terms=True,
   )
