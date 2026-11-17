@@ -6,9 +6,10 @@
 #   12/11 fixes (f395750): easy start rows, linear tracking x2, vx <= 1.0
 #   13/11 fix: foot clearance measured from the ground under each foot
 #   16/11 fix: clearance charges only feet below target; yaw tracking x2
+#   17/11 fix: pose std for knee / hip pitch while walking 0.5 -> 1.0 rad
 #
-# Defaults: resume the newest *_stairs_teacher3 run (16/11 result) at its newest
-# model_*.pt for 5000 more iterations as run stairs_teacher4. Override with
+# Defaults: resume the newest *_stairs_teacher4 run (17/11 result) at its newest
+# model_*.pt for 5000 more iterations as run stairs_teacher5. Override with
 #   FROM='*_stairs_teacher' CKPT=model_2400.pt ITERS=5600 RUN_NAME=stairs_teacher2 ./run_stairs_teacher_resume.sh
 # Stop any other training on the GPU first: two runs halve the speed of both.
 # Usage: ./run_stairs_teacher_resume.sh [extra train.py args, e.g. --env.scene.num-envs=2048]
@@ -20,11 +21,11 @@ cd "$(dirname "$0")"
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 
 LOGS=logs/rsl_rl/g1_23dof_velocity
-FROM="${FROM:-*_stairs_teacher3}"
+FROM="${FROM:-*_stairs_teacher4}"
 ITERS="${ITERS:-5000}"
-RUN_NAME="${RUN_NAME:-stairs_teacher4}"
+RUN_NAME="${RUN_NAME:-stairs_teacher5}"
 
-# The glob matches whole names only, so *_stairs_teacher3 never picks *_stairs_teacher4.
+# The glob matches whole names only, so *_stairs_teacher4 never picks *_stairs_teacher5.
 LOAD_RUN="${LOAD_RUN:-$(ls -d "$LOGS"/$FROM 2>/dev/null | sort | tail -n 1 | xargs -r -n1 basename)}"
 if [ -z "$LOAD_RUN" ] || [ ! -d "$LOGS/$LOAD_RUN" ]; then
   echo "No run matching '$FROM' under $LOGS (set FROM=... or LOAD_RUN=...)" >&2

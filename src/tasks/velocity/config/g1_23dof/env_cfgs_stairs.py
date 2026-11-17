@@ -131,6 +131,16 @@ def unitree_g1_23dof_open_stairs_teacher_env_cfg(
   #    (error_vel_yaw ~2.5 through teacher2/3; heading control hid it in
   #    training).
   cfg.rewards["track_angular_velocity"].weight = 2.0
+  # 7. (17/11) Let the knee and hip pitch bend far from the home pose while
+  #    walking: a 12-15 cm step needs ~0.9 rad more knee than standing, and
+  #    with std 0.5 rad the pose reward was nearly gone there (teacher4
+  #    stopped at every edge from 10 cm; curriculum stuck near 7 cm).
+  #    Copy the dict so the base config's (shared) one is left as it was.
+  pose = cfg.rewards["pose"]
+  std_walking = dict(pose.params["std_walking"])
+  std_walking[".*hip_pitch.*"] = 1.0
+  std_walking[".*knee.*"] = 1.0
+  pose.params = {**pose.params, "std_walking": std_walking}
   return cfg
 
 
