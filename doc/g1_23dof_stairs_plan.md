@@ -22,7 +22,7 @@
 | 1 | สร้าง terrain บันไดโปร่งใน `src/tasks/velocity/config/g1_23dof/` | ไม่ | เสร็จ 6/11 (task `Unitree-G1-23Dof-OpenStairs-Blind`) |
 | 2 | Baseline: วัดว่า policy blind เดินบนบันไดโปร่งได้สูงสุดกี่ cm | ไม่ | เสร็จ 11/11 สำหรับ P3b (ยังไม่มี `Rough-Blind` ที่เทรนเสร็จให้วัด) |
 | 2b | Fine-tune แบบ blind บนบันไดโปร่ง (resume P3b, `run_stairs_blind_train.sh`, 4000 iteration) แล้ววัดด้วย `eval_open_stairs.py` · บอกว่า blind ไปได้ไกลแค่ไหน และเป็น baseline ที่ teacher ต้องชนะ | ไม่ | เสร็จ 11/11: ขึ้นได้ถึง ~5 cm (44% ที่ 5 cm, 0% ตั้งแต่ 8 cm) และเดินช้าลง ไม่ใช้แทน P3b · ผลดิบ `step2b_stairs_blind_vx0.5.jsonl` |
-| 3 | Teacher: เทรนด้วย `height_scan` แบบ privileged | ไม่ | 17/11 `stairs_teacher4` model_17997 (heading hold): **ลง ≤ 8 cm 100%, ขึ้น 3/5/8 cm 95/97/70%** · ≥ 10 cm ยังหยุดที่ขอบ (ลง 11%, ขึ้น 9%) · curriculum ค้าง ~2.9 (≈ 7 cm) · ยังไม่ถึงเป้า ≥ 80% ที่ 8–10 cm (ดูบันทึกผลขั้น 3c) |
+| 3 | Teacher: เทรนด้วย `height_scan` แบบ privileged | ไม่ | 18/11 `stairs_teacher5` model_22996 (heading hold): **ลง ≤ 10 cm 98–100%, ลง 12 cm 36%** · ขึ้น 3/5/8/10 cm 97/97/56/8% (ขึ้นแย่กว่า teacher4 ที่ 8 cm) · ล้ม ≤ 5% ทุกเคส = หยุดที่ขอบ ไม่ล้ม · ส่ง teacher6 (`a59b530`: `is_terminated` −100 + progress reward) เทรนต่อจาก teacher5 (ดูขั้น 3d) |
 | 4 | Student: depth จาก `PinholeCameraPatternCfg` ตั้งค่าตาม D455 (noise, latency, ตัดระยะใกล้) + GRU แล้ว distill จาก teacher | ไม่ | ยังไม่ทำ |
 | 5 | อ่านภาพ D455 จริงแบบอ่านอย่างเดียว เทียบกับภาพจำลอง วัด latency | อ่านอย่างเดียว | ยังไม่ทำ |
 | 6 | ทดสอบบนหุ่น | ใช่ | รอให้เดินพื้นเรียบผ่านก่อน |
@@ -148,3 +148,28 @@ checkpoint `stairs_teacher4/model_17997.pt` (resume teacher3 + `7e2c328` อี�
   2. `is_terminated` −200 เทียบ tracking ~2 ต่อ step → ยืนนิ่งที่ขอบคุ้มกว่าเสี่ยง (หยุด ไม่ล้ม)
   3. `terrain_levels_vel` (mdp ที่ใช้ร่วม แก้ไม่ได้): ต้องไปไกล > 4 m ไม่งั้นลดแถว ขณะที่คำสั่งสุ่มใหม่ทุก 3–8 s → ระดับนิ่งที่จุดสำเร็จ ~50%
 - เสนอ teacher5: ผ่อน `pose` std ตอนเดินของ knee/hip_pitch 0.5 → 1.0 (เฉพาะงานบันได) ยังไม่แตะ `is_terminated` เพื่อแยกผล · ยังรอขนาดบันไดจริง (ขั้น 0) เพื่อกำหนดเป้าความสูง
+
+### ขั้น 3d: teacher5 (pose std knee/hip_pitch 1.0) (18/11/2026)
+
+checkpoint `stairs_teacher5/model_22996.pt` (resume teacher4 + `9319338` อีก 5000 iteration) · ผลดิบ `step3d_teacher5_vx0.5.jsonl` (wz = 0), `step3d_teacher5_vx0.5_hold.jsonl` (heading hold)
+
+ตอนเทรน: `terrain_levels` 2.96 → 3.04 (iteration 20286) → **2.74** ตอนจบ · error_vel_yaw 1.63 → 1.81 · ล้มลดลงครึ่งหนึ่ง (fell_over 0.75 → 0.375 ต่อรอบ log)
+
+| สูงขั้น | ลง wz=0: t4 / **t5** | ลง hold: t4 / **t5** | ขึ้น wz=0: t4 / **t5** | ขึ้น hold: t4 / **t5** |
+|---|---|---|---|---|
+| 0 cm | 89% / 88% | 98% / 100% | 92% / 89% | 100% / 98% |
+| 3 cm | 98% / 95% | 100% / 100% | 77% / 72% | 95% / 97% |
+| 5 cm | 94% / 98% | 100% / 100% | 69% / 58% | 97% / 97% |
+| 8 cm | 92% / 98% | 100% / 100% | 27% / 9% | 70% / 56% |
+| 10 cm | 11% / **83%** | 11% / **98%** | 3% / 3% | 9% / 8% |
+| 12 cm | 0% / **34%** | 0% / **36%** | 0% / 2% | 0% / 0% |
+| 15–18 cm | 0% | 0% | 0% | 0% |
+
+ล้ม ≤ 5% ทุกเคส
+
+อ่านผล:
+- pose std ช่วย **ขาลง** ชัดเจน (10 cm 11% → 98%, 12 cm 0% → 36%): ลงขั้นสูงต้องงอเข่าขาที่ยืนมาก ซึ่ง std 0.5 เคยลงโทษ
+- **ขาขึ้นไม่ดีขึ้น** (8 cm แย่ลง 70% → 56%, wz = 0 27% → 9%) และ 10 cm ยัง ~8% · หุ่นยังหยุดที่ขอบ ไม่ได้ล้ม
+- curriculum ถอยกลับ (3.04 → 2.74) ทั้งที่ล้มน้อยลง = เลือกเล่นปลอดภัย ตรงกับสาเหตุข้อ 2 ของขั้น 3c (`is_terminated` −200 แพงกว่าการยืนรอ)
+- teacher6 (`a59b530`): `is_terminated` −200 → −100 และ reward `progress_along_command` (w 1.0, เชิงเส้น, ยืนนิ่งได้ 0; tracking แบบ exp ยังให้ 37% ตอนยืนนิ่งที่ cmd 0.5 m/s) · resume จาก **teacher5** (ขาลง 10–12 cm ได้แล้ว ขาขึ้นใกล้ teacher4; ตอนแรกตั้งเป็น teacher4 ตาม `terrain_levels` แต่ eval บอกว่า teacher5 ดีกว่า) · คง pose std 1.0 ไว้เพราะช่วยขาลง
+
