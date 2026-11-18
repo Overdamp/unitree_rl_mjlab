@@ -7,9 +7,11 @@
 #   13/11 fix: foot clearance measured from the ground under each foot
 #   16/11 fix: clearance charges only feet below target; yaw tracking x2
 #   17/11 fix: pose std for knee / hip pitch while walking 0.5 -> 1.0 rad
+#   18/11 fixes: is_terminated -200 -> -100; progress-along-command reward (w 1.0)
 #
-# Defaults: resume the newest *_stairs_teacher4 run (17/11 result) at its newest
-# model_*.pt for 5000 more iterations as run stairs_teacher5. Override with
+# Defaults: resume the newest *_stairs_teacher4 run (teacher5 did not beat it:
+# terrain_levels 2.74 vs ~2.96) at its newest model_*.pt for 5000 more
+# iterations as run stairs_teacher6. Override with
 #   FROM='*_stairs_teacher' CKPT=model_2400.pt ITERS=5600 RUN_NAME=stairs_teacher2 ./run_stairs_teacher_resume.sh
 # Stop any other training on the GPU first: two runs halve the speed of both.
 # Usage: ./run_stairs_teacher_resume.sh [extra train.py args, e.g. --env.scene.num-envs=2048]
@@ -23,7 +25,7 @@ export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 LOGS=logs/rsl_rl/g1_23dof_velocity
 FROM="${FROM:-*_stairs_teacher4}"
 ITERS="${ITERS:-5000}"
-RUN_NAME="${RUN_NAME:-stairs_teacher5}"
+RUN_NAME="${RUN_NAME:-stairs_teacher6}"
 
 # The glob matches whole names only, so *_stairs_teacher4 never picks *_stairs_teacher5.
 LOAD_RUN="${LOAD_RUN:-$(ls -d "$LOGS"/$FROM 2>/dev/null | sort | tail -n 1 | xargs -r -n1 basename)}"

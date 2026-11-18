@@ -91,3 +91,29 @@ def feet_clearance_terrain(
       total = torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2])
       cost = cost * (total > command_threshold).float()
   return cost
+
+
+def progress_along_command(
+  env: ManagerBasedRlEnv,
+  command_name: str,
+  command_threshold: float = 0.1,
+  asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+  """Linear reward in [0, 1] for base speed along the commanded xy direction,
+  as a fraction of the commanded speed (body frame, capped at the command so
+  overspeed earns nothing; 0 while the command is below the threshold).
+
+  The shared tracking reward exp(-err^2 / 0.25) still pays 37% when a robot
+  told to walk at 0.5 m/s stands still, so stopping in front of a tall step
+  costs little against the fall it avoids (teacher4/5 stopped at every edge
+  from 10 cm). This term pays nothing for standing."""
+  asset = env.scene[asset_cfg.name]
+  command = env.command_manager.get_command(command_name)
+  assert command is not None, f"Command '{command_name}' not found."
+  cmd_xy = command[:, :2]
+  speed_cmd = torch.norm(cmd_xy, dim=1)
+  active = speed_cmd > command_threshold
+  direction = cmd_xy / speed_cmd.clamp(min=1e-6).unsqueeze(1)
+  along = torch.sum(asset.data.root_link_lin_vel_b[:, :2] * direction, dim=1)
+  frac = torch.clamp(along, min=0.0) / speed_cmd.clamp(min=1e-6)
+  return torch.clamp(frac, max=1.0) * active.float()

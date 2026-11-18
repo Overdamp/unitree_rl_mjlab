@@ -21,7 +21,13 @@ from .env_cfgs import (
 )
 from .amp_ppo import AMP_OBS_GROUP, amp_state
 from .depth_camera import d455_sensor_cfg, depth_image, get_spec_with_d455
-from .rewards_stairs import feet_clearance_terrain, foot_ground_ray_cfgs
+from mjlab.managers.reward_manager import RewardTermCfg
+
+from .rewards_stairs import (
+  feet_clearance_terrain,
+  foot_ground_ray_cfgs,
+  progress_along_command,
+)
 from .terrains_stairs import OpenRiserStairsTerrainCfg
 
 # Placeholders until the target staircase is measured (plan step 0).
@@ -142,6 +148,19 @@ def unitree_g1_23dof_open_stairs_teacher_env_cfg(
   std_walking[".*hip_pitch.*"] = 1.0
   std_walking[".*knee.*"] = 1.0
   pose.params = {**pose.params, "std_walking": std_walking}
+  # 8. (18/11) Make falling cheaper: is_terminated -200 -> -100. teacher5
+  #    fell half as often as at mid-run but its curriculum fell back to ~7 cm
+  #    (terrain_levels 3.04 -> 2.74): a fall (-200 x 0.02 = -4 plus the lost
+  #    future reward) cost more than standing at the edge (~-1 over 2 s).
+  cfg.rewards["is_terminated"].weight = -100.0
+  # 9. (18/11) Pay for actual progress along the command (rewards_stairs.py):
+  #    linear, 0 when standing, so stopping at an edge now loses up to
+  #    1.0 x dt per step on top of the tracking reward.
+  cfg.rewards["progress"] = RewardTermCfg(
+    func=progress_along_command,
+    weight=1.0,
+    params={"command_name": "twist", "command_threshold": 0.1},
+  )
   return cfg
 
 
