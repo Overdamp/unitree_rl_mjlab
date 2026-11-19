@@ -25,7 +25,10 @@ from mjlab.managers.reward_manager import RewardTermCfg
 
 from .rewards_stairs import (
   feet_clearance_terrain,
+  feet_stumble,
   foot_ground_ray_cfgs,
+  foot_sole_ray_cfgs,
+  foothold_unsupported,
   progress_along_command,
 )
 from .terrains_stairs import OpenRiserStairsTerrainCfg
@@ -160,6 +163,22 @@ def unitree_g1_23dof_open_stairs_teacher_env_cfg(
     func=progress_along_command,
     weight=1.0,
     params={"command_name": "twist", "command_threshold": 0.1},
+  )
+  # 10. (19/11, teacher7) Land the stance foot on the tread. teacher6 lifted
+  #     its feet over the edge but kept its step length: going up the sole
+  #     centre landed 6-13 cm behind the tread centre with the heel over the
+  #     riser gap (foothold_open_stairs.py, plan step 3f). Charge the share of
+  #     six sole points whose ground is > 1.5 cm below the highest ground under
+  #     that foot, per foot in contact (0..2 per step).
+  cfg.scene.sensors = cfg.scene.sensors + foot_sole_ray_cfgs()
+  cfg.rewards["foothold"] = RewardTermCfg(
+    func=foothold_unsupported, weight=-1.0, params={"sensor_name": "feet_ground_contact"}
+  )
+  # 11. (19/11, teacher7) Charge feet pushing on an edge (contact force more
+  #     horizontal than vertical, > 20 N): 3-30x more of these steps in
+  #     robots that failed than in robots that made it.
+  cfg.rewards["stumble"] = RewardTermCfg(
+    func=feet_stumble, weight=-0.5, params={"sensor_name": "feet_ground_contact"}
   )
   return cfg
 

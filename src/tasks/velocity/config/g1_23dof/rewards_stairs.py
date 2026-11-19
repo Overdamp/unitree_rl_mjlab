@@ -16,11 +16,13 @@ ground and then misses it.) The shared reward and mdp/* stay untouched.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import torch
 
 from mjlab.envs import ManagerBasedRlEnv
 from mjlab.managers.scene_entity_config import SceneEntityCfg
-from mjlab.sensor import ObjRef, RayCastSensorCfg
+from mjlab.sensor import ContactSensor, ObjRef, RayCastSensorCfg
 from mjlab.sensor import GridPatternCfg
 from mjlab.sensor.raycast_sensor import RayCastSensor
 
@@ -117,3 +119,96 @@ def progress_along_command(
   along = torch.sum(asset.data.root_link_lin_vel_b[:, :2] * direction, dim=1)
   frac = torch.clamp(along, min=0.0) / speed_cmd.clamp(min=1e-6)
   return torch.clamp(frac, max=1.0) * active.float()
+
+
+# --- teacher7 (19/11): where the stance foot stands -------------------------
+# foothold_open_stairs.py on teacher6 model_24500 (doc/g1_23dof_stairs_plan.md,
+# step 3f): going up the feet land on the back of the tread, sole centre
+# -6 cm (5 cm rise) to -13 cm (10 cm) behind the tread centre, heel over the
+# riser gap on 40-52% of touchdowns of robots that made it and 68-70% of
+# those that did not (support 29-44% of the sole). Nothing rewarded where the
+# foot lands; these two terms do.
+
+# Sole points in the ankle roll link (g1_23dof.xml foot capsules span
+# x -0.054..0.132, y +-0.026, bottom z -0.035): heel / middle / toe x
+# left / right edge.
+SOLE_POINTS_X = (-0.045, 0.04, 0.125)
+SOLE_POINTS_Y = (-0.02, 0.02)
+# A sole point whose ground is this much below the foot's highest ground is
+# over an edge (the open stairs start at 2 cm rise).
+FOOTHOLD_GAP_M = 0.015
+
+
+@dataclass
+class SolePointsPatternCfg(GridPatternCfg):
+  """Parallel rays from fixed points of the sole (frame-local x, y; z = 0),
+  instead of a grid centred on the frame."""
+
+  xs: tuple[float, ...] = SOLE_POINTS_X
+  ys: tuple[float, ...] = SOLE_POINTS_Y
+
+  def generate_rays(self, mj_model, device: str) -> tuple[torch.Tensor, torch.Tensor]:
+    del mj_model
+    pts = [(x, y, 0.0) for x in self.xs for y in self.ys]
+    offsets = torch.tensor(pts, device=device, dtype=torch.float32)
+    d = torch.tensor(self.direction, device=device, dtype=torch.float32)
+    return offsets, (d / d.norm()).expand(len(pts), 3).clone()
+
+
+def foot_sole_ray_cfgs() -> tuple[RayCastSensorCfg, ...]:
+  """Six downward rays per foot from the ankle roll link origin height (3.5 cm
+  above the sole, so a foot sunk a few mm still starts above the ground),
+  laid out along the sole and following the foot's yaw; terrain only."""
+  return tuple(
+    RayCastSensorCfg(
+      name=f"{site}_sole_rays",
+      frame=ObjRef(type="body", name=body, entity="robot"),
+      pattern=SolePointsPatternCfg(),
+      ray_alignment="yaw",
+      max_distance=FOOT_RAY_MAX_M,
+      exclude_parent_body=True,
+      include_geom_groups=(0,),
+    )
+    for site, body in zip(FOOT_SITES, FOOT_BODIES)
+  )
+
+
+def foothold_unsupported(
+  env: ManagerBasedRlEnv,
+  sensor_name: str = "feet_ground_contact",
+  gap: float = FOOTHOLD_GAP_M,
+) -> torch.Tensor:
+  """(B,) sum over feet in contact of the share of sole points whose ground
+  lies more than `gap` below the highest ground under that foot (the surface
+  it stands on): heel over the riser gap, toe past the nosing. 0 for a foot
+  on one level, also while it rolls heel-to-toe (comparing with the sole
+  height instead charged ~0.18 per step on flat ground). Up to 1 per foot.
+  Uses only the geometry under the foot, so it works on any terrain without
+  knowing where the edges are."""
+  contact: ContactSensor = env.scene[sensor_name]
+  found = contact.data.found[:, :2] > 0
+  shares = []
+  for site in FOOT_SITES:
+    data = env.scene[f"{site}_sole_rays"].data
+    z = torch.where(data.distances < 0, torch.full_like(data.distances, -1e3), data.hit_pos_w[..., 2])
+    top = z.max(dim=1, keepdim=True).values
+    shares.append((top - z > gap).float().mean(dim=1))
+  return torch.sum(torch.stack(shares, dim=1) * found.float(), dim=1)
+
+
+def feet_stumble(
+  env: ManagerBasedRlEnv,
+  sensor_name: str = "feet_ground_contact",
+  ratio: float = 1.0,
+  min_force: float = 20.0,
+) -> torch.Tensor:
+  """(B,) number of feet whose ground contact force is more horizontal than
+  vertical (|F_xy| > ratio * |F_z| and > min_force N): toe or heel pushing
+  on an edge. Robots that failed in foothold_open_stairs.py had 3-30x more
+  such steps than robots that made it."""
+  contact: ContactSensor = env.scene[sensor_name]
+  force = contact.data.force[:, :2]
+  found = contact.data.found[:, :2] > 0
+  horiz = torch.norm(force[..., :2], dim=-1)
+  hit = found & (horiz > ratio * force[..., 2].abs()) & (horiz > min_force)
+  return hit.float().sum(dim=1)

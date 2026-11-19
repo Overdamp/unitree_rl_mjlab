@@ -42,37 +42,31 @@ FIRST_EDGE = 0.5 * PATCH - BORDER - NUM_STEPS * TREAD  # x of the step edge near
 STAIRS_END = 0.5 * PATCH - BORDER + 0.3  # x from the patch centre where the stairs are behind
 
 
-def run_case(args) -> dict:
-  import torch
-
-  import mjlab.tasks  # noqa: F401
-  import src.tasks  # noqa: F401
-  from mjlab.envs import ManagerBasedRlEnv
-  from mjlab.rl import MjlabOnPolicyRunner, RslRlVecEnvWrapper
-  from mjlab.tasks.registry import load_env_cfg, load_rl_cfg, load_runner_cls
-  from mjlab.utils.torch import configure_torch_backends
+def make_env_cfg(task: str, rise: float, up: bool, vx: float, heading_hold: bool, num_envs: int,
+                 num_cols: int = 4):
+  """Env cfg with open-riser staircases (robots on the centre platform, facing
+  +x, commanded straight ahead). Robots share the num_cols staircases; each
+  sim world is separate, so robots on the same one do not touch. Shared with
+  view_open_stairs_case.py (one staircase per robot there, easier to watch)."""
+  from mjlab.tasks.registry import load_env_cfg
   from src.tasks.velocity.config.g1_23dof.terrains_stairs import (
     OpenRiserStairsTerrainCfg,
   )
 
-  configure_torch_backends()
-  device = "cuda:0" if torch.cuda.is_available() else "cpu"
-  up = args.direction == "up"
-
-  cfg = load_env_cfg(args.task, play=True)
-  cfg.scene.num_envs = args.num_envs
+  cfg = load_env_cfg(task, play=True)
+  cfg.scene.num_envs = num_envs
   gen = cfg.scene.terrain.terrain_generator
   cfg.scene.terrain.terrain_generator = replace(
     gen,
     curriculum=False,
     num_rows=1,
-    num_cols=4,
+    num_cols=num_cols,
     size=(PATCH, PATCH),
     sub_terrains={
       "stairs": OpenRiserStairsTerrainCfg(
         proportion=1.0,
         inverted=up,
-        step_height_range=(args.rise, args.rise),
+        step_height_range=(rise, rise),
         tread_depth_range=(TREAD, TREAD),
         tread_thickness_range=(THICK, THICK),
         nosing_range=(NOSING, NOSING),
@@ -92,14 +86,31 @@ def run_case(args) -> dict:
   twist = cfg.commands["twist"]
   twist.rel_standing_envs = 0.0
   twist.resampling_time_range = (1e6, 1e6)
-  twist.ranges.lin_vel_x = (args.vx, args.vx)
+  twist.ranges.lin_vel_x = (vx, vx)
   twist.ranges.lin_vel_y = (0.0, 0.0)
   # Heading 0 is commanded; with ang_vel_z (0, 0) the heading controller's wz
   # is clipped to zero, so a drifting robot is never steered back (a
   # policy that does not hold wz = 0 by itself turns away from the stairs).
   # --heading-hold lets it steer up to +-1 rad/s, like an operator would.
-  twist.ranges.ang_vel_z = (-1.0, 1.0) if args.heading_hold else (0.0, 0.0)
+  twist.ranges.ang_vel_z = (-1.0, 1.0) if heading_hold else (0.0, 0.0)
   twist.ranges.heading = (0.0, 0.0)
+  return cfg
+
+
+def run_case(args) -> dict:
+  import torch
+
+  import mjlab.tasks  # noqa: F401
+  import src.tasks  # noqa: F401
+  from mjlab.envs import ManagerBasedRlEnv
+  from mjlab.rl import MjlabOnPolicyRunner, RslRlVecEnvWrapper
+  from mjlab.tasks.registry import load_rl_cfg, load_runner_cls
+  from mjlab.utils.torch import configure_torch_backends
+
+  configure_torch_backends()
+  device = "cuda:0" if torch.cuda.is_available() else "cpu"
+  up = args.direction == "up"
+  cfg = make_env_cfg(args.task, args.rise, up, args.vx, args.heading_hold, args.num_envs)
 
   agent_cfg = load_rl_cfg(args.task)
   env = RslRlVecEnvWrapper(

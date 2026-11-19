@@ -8,10 +8,14 @@
 #   16/11 fix: clearance charges only feet below target; yaw tracking x2
 #   17/11 fix: pose std for knee / hip pitch while walking 0.5 -> 1.0 rad
 #   18/11 fixes: is_terminated -200 -> -100; progress-along-command reward (w 1.0)
+#   19/11 fixes: foothold reward (sole over an edge, w -1.0), stumble (w -0.5),
+#                actions clipped to +-10 in rl_cfg.py (STAIRS_CLIP_ACTIONS;
+#                unclipped spikes blew up action_rate and the value loss in
+#                teacher5/6). Deploy must clip the same.
 #
-# Defaults: resume the newest *_stairs_teacher5 run (18/11 eval: down 10 cm
-# 98% vs teacher4 11%, up about the same) at its newest model_*.pt for 5000
-# more iterations as run stairs_teacher6. Override with
+# Defaults: resume the newest *_stairs_teacher6 run at model_24500.pt (before
+# its value loss blew up; best eval, plan step 3e) for 3000 more iterations as
+# run stairs_teacher7. Override with
 #   FROM='*_stairs_teacher' CKPT=model_2400.pt ITERS=5600 RUN_NAME=stairs_teacher2 ./run_stairs_teacher_resume.sh
 # Stop any other training on the GPU first: two runs halve the speed of both.
 # Usage: ./run_stairs_teacher_resume.sh [extra train.py args, e.g. --env.scene.num-envs=2048]
@@ -23,9 +27,9 @@ cd "$(dirname "$0")"
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 
 LOGS=logs/rsl_rl/g1_23dof_velocity
-FROM="${FROM:-*_stairs_teacher5}"
-ITERS="${ITERS:-5000}"
-RUN_NAME="${RUN_NAME:-stairs_teacher6}"
+FROM="${FROM:-*_stairs_teacher6}"
+ITERS="${ITERS:-3000}"
+RUN_NAME="${RUN_NAME:-stairs_teacher7}"
 
 # The glob matches whole names only, so *_stairs_teacher5 never picks *_stairs_teacher6.
 LOAD_RUN="${LOAD_RUN:-$(ls -d "$LOGS"/$FROM 2>/dev/null | sort | tail -n 1 | xargs -r -n1 basename)}"
@@ -34,7 +38,11 @@ if [ -z "$LOAD_RUN" ] || [ ! -d "$LOGS/$LOAD_RUN" ]; then
   exit 1
 fi
 # Sort bare file names by number (the full path has underscores of its own).
-CKPT="${CKPT:-$(ls "$LOGS/$LOAD_RUN" | grep -E '^model_[0-9]+\.pt$' | sort -V | tail -n 1)}"
+# CKPT=latest picks the newest model_*.pt.
+CKPT="${CKPT:-model_24500.pt}"
+if [ "$CKPT" = latest ]; then
+  CKPT="$(ls "$LOGS/$LOAD_RUN" | grep -E '^model_[0-9]+\.pt$' | sort -V | tail -n 1)"
+fi
 echo "Resuming $LOAD_RUN/$CKPT for $ITERS iterations as $RUN_NAME"
 
 python scripts/train.py Unitree-G1-23Dof-OpenStairs-Teacher \
