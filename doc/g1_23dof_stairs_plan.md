@@ -173,3 +173,28 @@ checkpoint `stairs_teacher5/model_22996.pt` (resume teacher4 + `9319338` อี�
 - curriculum ถอยกลับ (3.04 → 2.74) ทั้งที่ล้มน้อยลง = เลือกเล่นปลอดภัย ตรงกับสาเหตุข้อ 2 ของขั้น 3c (`is_terminated` −200 แพงกว่าการยืนรอ)
 - teacher6 (`a59b530`): `is_terminated` −200 → −100 และ reward `progress_along_command` (w 1.0, เชิงเส้น, ยืนนิ่งได้ 0; tracking แบบ exp ยังให้ 37% ตอนยืนนิ่งที่ cmd 0.5 m/s) · resume จาก **teacher5** (ขาลง 10–12 cm ได้แล้ว ขาขึ้นใกล้ teacher4; ตอนแรกตั้งเป็น teacher4 ตาม `terrain_levels` แต่ eval บอกว่า teacher5 ดีกว่า) · คง pose std 1.0 ไว้เพราะช่วยขาลง
 
+### ขั้น 3e: teacher6 (cheaper falls + progress reward) (19/11/2026)
+
+run `2026-11-18_11-54-57_stairs_teacher6` (resume teacher5 model_22996, 5000 iteration) · ผลดิบ `step3e_teacher6_<ckpt>_vx0.5{,_hold}.jsonl`
+
+ตอนเทรน: `terrain_levels` 1.7 → **3.81** (iteration ~24300–24500) แล้วถอยเหลือ 3.09 ตอนจบ · ตั้งแต่ iteration 24957 `action_rate_l2` ระเบิดเป็นช่วงๆ (แย่สุด −794,913 จากปกติ −1.1) ทำให้ `Loss/value` ถึง 4.7e13 แล้ว policy เสื่อม (std 0.57 → 0.69, ล้มเพิ่ม) · เริ่มเกิดตั้งแต่ teacher5 (iteration 19601, 14 ครั้ง) teacher2–4 ไม่เคยเกิด · action ไม่ได้ clip (`clip_actions` = None)
+
+heading hold (success %):
+
+| สูงขั้น | ลง t5 / 24500 / 24900 / 27995 | ขึ้น t5 / 24500 / 24900 / 27995 |
+|---|---|---|
+| 5 cm | 100 / 100 / 100 / 100 | 97 / **100** / 95 / 86 |
+| 8 cm | 100 / 100 / 100 / 100 | 56 / **98** / 88 / 58 |
+| 10 cm | 98 / 100 / 100 / 100 | 8 / **75** / 27 / 17 |
+| 12 cm | 36 / **100** / 98 / 100 | 0 / 12 / 2 / 3 |
+| 15 cm | 0 / **91** / 92 / 86 | 0 |
+| 18 cm | 0 / **84** / 69 / 58 | 0 |
+
+ล้ม ≤ 9% ยกเว้นลง 18 cm (8–12%) · โหมด wz = 0 ขาขึ้นยังแย่ (5 cm 23%, 8 cm 5% ที่ 24500) = หุ่นหันเบี่ยงเองเมื่อไม่มีการแก้ heading
+
+อ่านผล:
+- **model_24500 ดีที่สุด** (ก่อน spike แรก): ขึ้น 8 cm 98%, ขึ้น 10 cm 75% (เป้า 80%), ลงได้ถึง 18 cm 84% → progress reward + โทษล้มที่ถูกลงแก้ปัญหาหยุดที่ขอบได้
+- checkpoint หลัง spike แย่ลงตามลำดับ → ปัญหาคือความเสถียรเชิงตัวเลข ไม่ใช่ reward
+- ขนาด action ของ 24500 (512 env บน terrain เทรน): |a| p50 0.27, p99 3.06, p99.9 4.46, max 10.7 (เข่า)
+- teacher7: resume 24500 + `--agent.clip-actions=10` (ไม่ตัด action ปกติ แต่กัน `action_rate` ระเบิด) · deploy ต้อง clip ค่าเดียวกัน
+
