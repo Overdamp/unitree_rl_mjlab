@@ -221,3 +221,25 @@ teacher7 (`rewards_stairs.py`, `env_cfgs_stairs.py` ข้อ 10–11, `run_stai
 - `clip_actions` 10 ตั้งใน `rl_cfg.py` (`STAIRS_CLIP_ACTIONS`, runner cfg ของ Teacher / Depth / AMP; Flat / Rough / Blind ไม่ clip เหมือนเดิม) · eval checkpoint เก่า (t4–t6) จะ clip 10 ด้วย ผลแทบไม่ต่างเพราะ action ไม่ค่อยถึง 10
 - เป้า: ขึ้น 10 cm ≥ 80% และวัดซ้ำด้วย `foothold_open_stairs.py`: กลางเท้าเยื้อง ≤ ±5 cm, ส้นล้นขอบ < 15%
 - รัน (DGX): `./run_stairs_teacher_resume.sh` (ค่าเริ่มต้น = teacher6 model_24500, 3000 iteration, clip 10)
+
+#### ผล teacher7 แบบ clip อย่างเดียว (20/11/2026)
+
+run `2026-11-19_11-02-54_stairs_teacher7` เริ่มก่อน commit reward foothold: resume teacher6 model_24500 + `--agent.clip-actions=10` อย่างเดียว 3000 iteration · ผลดิบ `step3f_teacher7clip_27499_vx0.5{,_hold}.jsonl`
+
+ตอนเทรน (เทียบ teacher6 ช่วง iteration เดียวกัน): `action_rate_l2` แย่สุด −0.94 (t6 −794,913) · `Loss/value` สูงสุด 0.28 (t6 4.7e13) · `terrain_levels` 3.76–3.85 นิ่ง (t6 ถอยเหลือ 3.0–3.5) · std 0.57 คงที่ → **clip แก้ปัญหาค่าระเบิดได้ทั้งหมด**
+
+heading hold, success % (t6 24500 / t7 27499):
+
+| สูงขั้น | ลง | ขึ้น |
+|---|---|---|
+| 0–8 cm | 98–100 / 100 | 98–100 / 98–100 |
+| 10 cm | 100 / 100 | 75 / 62 (128 env: 75.0 / **75.8**) |
+| 12 cm | 100 / 100 | 12 / **38** (128 env: 16.4 / **34.4**) |
+| 15 cm | 91 / 98 | 0 / 0 |
+| 18 cm | 84 / 75 | 0 / 0 |
+
+wz = 0 ขาขึ้นดีขึ้นเล็กน้อย (3 cm 45 → 59%, 5 cm 23 → 33%) · ล้ม ≤ 6% ทุกกรณี
+
+ตำแหน่งเท้า (ขึ้น 10 cm, 128 env, ตัวที่สำเร็จ): กลางเท้า −14.1 cm (t6 −12.0), ส้นล้นขอบหลัง 55% (t6 51%) = ไม่เปลี่ยน ตามคาดเพราะยังไม่มี reward foothold
+
+อ่านผล: clip ทำให้เทรนนิ่งและไม่เสื่อม ขึ้น 12 cm ดีขึ้น ~2 เท่า แต่ขึ้น 10 cm ยังประมาณ 75% (เป้า 80%) · run นี้ใช้เป็นตัวเทียบของ `stairs_teacher7_foothold` (เงื่อนไขเดียวกัน ต่างแค่ reward foothold + stumble)
