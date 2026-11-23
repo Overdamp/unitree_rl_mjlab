@@ -31,6 +31,7 @@ from .rewards_stairs import (
   foothold_unsupported,
   progress_along_command,
 )
+from .stair_token import stair_profile_ray_cfg, stair_token
 from .terrains_stairs import OpenRiserStairsTerrainCfg
 
 # Placeholders until the target staircase is measured (plan step 0).
@@ -224,6 +225,15 @@ def unitree_g1_23dof_open_stairs_depth_env_cfg(
   return cfg
 
 
+def _drop_foothold_stumble(cfg: ManagerBasedRlEnvCfg) -> ManagerBasedRlEnvCfg:
+  """(20/11) Remove the foothold / stumble rewards and their sole rays: with
+  them the robot stalled in front of steps (teacher7_foothold, plan step 3g)."""
+  for name in ("foothold", "stumble"):
+    del cfg.rewards[name]
+  cfg.scene.sensors = tuple(s for s in cfg.scene.sensors if not s.name.endswith("_sole_rays"))
+  return cfg
+
+
 def unitree_g1_23dof_open_stairs_teacher_amp_env_cfg(
   play: bool = False,
 ) -> ManagerBasedRlEnvCfg:
@@ -232,16 +242,28 @@ def unitree_g1_23dof_open_stairs_teacher_amp_env_cfg(
   that only the AMP discriminator reads. Actor and critic obs are unchanged,
   so teacher checkpoints resume here and the exported policy is the same.
   """
-  cfg = unitree_g1_23dof_open_stairs_teacher_env_cfg(play=play)
-  # (20/11) No foothold / stumble here: with them the robot stalled in front
-  # of steps (teacher7_foothold, plan step 3g). The AMP run resumes the
-  # clip-only teacher7, which never had them, so this is teacher7 + style.
-  for name in ("foothold", "stumble"):
-    del cfg.rewards[name]
-  cfg.scene.sensors = tuple(s for s in cfg.scene.sensors if not s.name.endswith("_sole_rays"))
+  # The AMP run resumes the clip-only teacher7, so this is teacher7 + style.
+  cfg = _drop_foothold_stumble(unitree_g1_23dof_open_stairs_teacher_env_cfg(play=play))
   cfg.observations[AMP_OBS_GROUP] = ObservationGroupCfg(
     terms={"amp_state": ObservationTermCfg(func=amp_state)},
     enable_corruption=False,
     concatenate_terms=True,
   )
+  return cfg
+
+
+def unitree_g1_23dof_open_stairs_teacher8_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """teacher8 (plan step 3h): clip-only teacher7 + an explicit stair geometry
+  token (stair_token.py: rise, tread depth, yaw to the edge, edge distance)
+  appended LAST to actor and critic obs (actor 267 + 4, critic 282 + 4), so a
+  teacher7 checkpoint widened by expand_checkpoint_obs.py resumes here and
+  starts out acting exactly like teacher7. The height scan stays: the token
+  only describes regular stairs.
+  """
+  cfg = _drop_foothold_stumble(unitree_g1_23dof_open_stairs_teacher_env_cfg(play=play))
+  cfg.scene.sensors = cfg.scene.sensors + (stair_profile_ray_cfg(),)
+  for group in ("actor", "critic"):
+    cfg.observations[group].terms["stair_token"] = ObservationTermCfg(func=stair_token)
   return cfg

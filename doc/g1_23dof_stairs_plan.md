@@ -275,3 +275,21 @@ wz = 0 แย่ลงทั้งขึ้นและลง: ขึ้น 3 cm
 - **teacher หลัก = teacher7 clip (`2026-11-19_11-02-54_stairs_teacher7/model_27499.pt`)** · พัก foothold / stumble รูปแบบนี้
 - ถัดไป: resume teacher7 clip เข้า `Unitree-G1-23Dof-OpenStairs-Teacher-AMP` ใช้ `walk1_straight.npz` (LAFAN1 walk1 200.5–208.5 s, เดินตรง 0.72 m/s) เป็นต้นแบบท่า แล้วเทียบกับ teacher7 clip ด้วย eval ชุดเดียวกัน
 - ถ้าลอง foothold อีก: หักเฉพาะเท้าที่วางนิ่งแล้ว (ไม่หักช่วงแตะพื้นแรก), ตัด stumble, w −0.3
+
+### ขั้น 3h: teacher8 = teacher7 clip + stair token (23/11/2026)
+
+อ้างอิง Zhang et al., "Explicit Stair Geometry Conditioning for Robust Humanoid Locomotion" (arXiv 2605.09944): ป้อนเรขาคณิตบันไดเป็นตัวเลขไม่กี่ค่าให้ policy ตรงๆ (เขา: ประเภทพื้น, h, d, yaw → ซิม 96% เทียบ HeightMap 88%, หุ่นจริงขึ้น 33 ขั้น) · เหตุผลที่ลองกับเรา: ขั้น 3f พบว่าหุ่น**ไม่ปรับระยะก้าว** และ foothold penalty (3g) ทำให้หยุดก้าว → ลองบอกความลึกขั้นตรงๆ แทนการลงโทษ
+
+`stair_token.py`: ray 3 เส้นตาม heading ของ pelvis (y −0.15 / 0 / +0.15 m, x −0.2 ถึง 1.2 m ทุก 2 cm, terrain เท่านั้น) หาขอบขั้นจากความสูงที่กระโดด > 1 cm · token 4 ค่า:
+- `h` ความสูงขั้นของขอบแรกข้างหน้า (+ ขึ้น / − ลง, 0 = ไม่มีขอบ) ใช้แทน "ประเภทพื้น" ของเปเปอร์
+- `d` ความลึกขั้น (ขอบแรก → ขอบสอง แก้ด้วย cos yaw)
+- `yaw` มุมหุ่นเทียบแนวขอบ (จากจุดที่เส้นซ้าย/ขวาตัดขอบเดียวกับเส้นกลาง)
+- `dist` ระยะ pelvis ถึงขอบแรก (ช่องที่ 4 แทนประเภทพื้น เพราะเกี่ยวกับการวางเท้าโดยตรง)
+
+วัดจาก ray ไม่ได้อ่านจาก terrain generator → ใช้ได้ทั้ง pyramid ตอนเทรน บันไดตรงของ eval และให้ student เรียนประมาณจากกล้องได้ภายหลัง · ตรวจกับค่าจริงบนบันได eval (16 env, 6 s): h ผิด 0 ทุกกรณี · d median ผิด 2.5 mm (p95 1.9 cm) · yaw median ผิด 0.019 rad (ความละเอียด ~0.067 rad จาก ray 2 cm; ผิดมากเฉพาะตอนหุ่นหันเกิน ~0.5 rad)
+
+resume แบบไม่เทรนใหม่: `expand_checkpoint_obs.py` ขยายชั้นแรก actor 267 → 271, critic 282 → 286 (น้ำหนักใหม่ = 0, normalizer mean 0 / std 1, Adam state pad 0) · ตรวจแล้ว action ของ teacher8 ก่อนเทรนเท่า teacher7 (ต่างสูงสุด 1.4e-6 ตลอด 300 step) · env = teacher7 (ไม่มี foothold / stumble) + token ต่อท้าย actor และ critic
+
+- รัน (DGX): `./run_stairs_teacher8.sh` (teacher7 model_27499 → 3000 iteration, run `stairs_teacher8`)
+- ความเสี่ยง: policy อาจไม่ใช้ token เพราะ teacher7 พึ่ง height scan อยู่แล้ว · ตรวจด้วย ablation (ใส่ token ผิด แล้วดูว่าการวางเท้าเปลี่ยนไหม) · ถ้าไม่ใช้: `NOISE=0.01` หรือเทรนนานขึ้น
+- เป้าเดิม: ขึ้น 10 cm ≥ 80%, กลางเท้าเยื้อง ≤ ±5 cm, ส้นล้นขอบ < 15% · eval: `--task Unitree-G1-23Dof-OpenStairs-Teacher8`
