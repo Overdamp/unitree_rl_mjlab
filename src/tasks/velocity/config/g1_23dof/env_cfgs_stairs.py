@@ -233,6 +233,12 @@ def unitree_g1_23dof_open_stairs_teacher_amp_env_cfg(
   so teacher checkpoints resume here and the exported policy is the same.
   """
   cfg = unitree_g1_23dof_open_stairs_teacher_env_cfg(play=play)
+  # (20/11) No foothold / stumble here: with them the robot stalled in front
+  # of steps (teacher7_foothold, plan step 3g). The AMP run resumes the
+  # clip-only teacher7, which never had them, so this is teacher7 + style.
+  for name in ("foothold", "stumble"):
+    del cfg.rewards[name]
+  cfg.scene.sensors = tuple(s for s in cfg.scene.sensors if not s.name.endswith("_sole_rays"))
   cfg.observations[AMP_OBS_GROUP] = ObservationGroupCfg(
     terms={"amp_state": ObservationTermCfg(func=amp_state)},
     enable_corruption=False,
