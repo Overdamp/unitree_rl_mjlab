@@ -35,6 +35,7 @@ from .rewards_stairs import (
 from mjlab.utils.noise import GaussianNoiseCfg
 
 from .stair_token import TOKEN_NOISE_STD, stair_profile_ray_cfg, stair_token
+from .curriculum_stairs import terrain_levels_chebyshev
 from .terrains_stairs import OpenRiserStairsTerrainCfg
 
 # Placeholders until the target staircase is measured (plan step 0).
@@ -60,6 +61,31 @@ def open_stairs_sub_terrains() -> dict:
     "flat": BoxFlatTerrainCfg(proportion=0.1),
     "open_stairs_down": OpenRiserStairsTerrainCfg(proportion=0.45, inverted=False, **common),
     "open_stairs_up": OpenRiserStairsTerrainCfg(proportion=0.45, inverted=True, **common),
+  }
+
+
+def open_stairs_straight_sub_terrains() -> dict:
+  """(24/11, teacher9) Half the stairs as straight flights between side walls
+  (no corners to climb at), half as the old rings so turning on stairs and
+  walking out in any direction stay in training."""
+  common = dict(
+    step_height_range=OPEN_STAIRS_RISE,
+    tread_depth_range=OPEN_STAIRS_TREAD,
+    tread_thickness_range=OPEN_STAIRS_THICKNESS,
+    nosing_range=OPEN_STAIRS_NOSING,
+    platform_width=2.0,
+    border_width=1.0,
+  )
+  return {
+    "flat": BoxFlatTerrainCfg(proportion=0.1),
+    "open_stairs_down": OpenRiserStairsTerrainCfg(proportion=0.2, inverted=False, **common),
+    "open_stairs_up": OpenRiserStairsTerrainCfg(proportion=0.2, inverted=True, **common),
+    "straight_stairs_down": OpenRiserStairsTerrainCfg(
+      proportion=0.25, inverted=False, straight=True, **common
+    ),
+    "straight_stairs_up": OpenRiserStairsTerrainCfg(
+      proportion=0.25, inverted=True, straight=True, **common
+    ),
   }
 
 
@@ -303,8 +329,20 @@ def unitree_g1_23dof_open_stairs_teacher9_env_cfg(
   2. Actor token noise (TOKEN_NOISE_STD) and 10% dropout to the flat token,
      training only, to prepare for a student that estimates the token from
      depth. The critic keeps the clean token.
+  3. Climb straight: teacher8 climbed at the ring corners (diagonal = sqrt(2)
+     longer treads, gentler slope) and drifted off the straight eval stairs
+     with wz = 0 (up 10 cm: 23%). Half the stair patches are now straight
+     flights between walls, and the curriculum promotes by Chebyshev
+     distance, so a diagonal walk no longer reaches the next level with
+     fewer steps climbed (curriculum_stairs.py).
   """
   cfg = unitree_g1_23dof_open_stairs_teacher8_env_cfg(play=play)
+  assert cfg.scene.terrain is not None and cfg.scene.terrain.terrain_generator is not None
+  cfg.scene.terrain.terrain_generator = replace(
+    cfg.scene.terrain.terrain_generator, sub_terrains=open_stairs_straight_sub_terrains()
+  )
+  if "terrain_levels" in cfg.curriculum:
+    cfg.curriculum["terrain_levels"].func = terrain_levels_chebyshev
   cfg.scene.sensors = cfg.scene.sensors + foot_sole_ray_cfgs()
   weight = float(os.environ.get("TEACHER9_FOOTHOLD_W", TEACHER9_FOOTHOLD_W))
   cfg.rewards["foothold"] = RewardTermCfg(

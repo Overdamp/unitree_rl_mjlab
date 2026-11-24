@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # teacher9 (plan step 3i): resume teacher8 into Unitree-G1-23Dof-OpenStairs-Teacher9
 # = teacher8 + foothold reward at -3 (no stumble term) + actor token noise and
-# 10% dropout (training only). Obs are the same as teacher8 (actor 271,
+# 10% dropout (training only) + half the stair patches as straight flights
+# between walls and a Chebyshev-distance curriculum (no corner shortcut). Obs are the same as teacher8 (actor 271,
 # critic 286), so the checkpoint loads as-is; no surgery.
 #
 # Goal: foot placement going up 10 cm from -9.4 cm / heel over the gap 44%
@@ -9,6 +10,8 @@
 # Watch Episode_Reward/foothold (should shrink toward 0) and progress /
 # terrain_levels (if they fall, the robot is stalling at edges again: stop and
 # retry with TEACHER9_FOOTHOLD_W=-2).
+# Then eval with wz = 0 (no heading hold): the straight-climb test
+# (teacher8 up 10 cm: 23%).
 #
 # Defaults: newest *_stairs_teacher8 run at its newest model_*.pt, 3000 more
 # iterations, run stairs_teacher9. Override with

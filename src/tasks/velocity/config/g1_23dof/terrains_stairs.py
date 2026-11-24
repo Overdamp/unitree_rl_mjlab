@@ -13,6 +13,12 @@ a nosing overhang and per-patch random tread depth / thickness / nosing.
 
   pyramid  (inverted=False): spawn on the top platform, walk out = go DOWN.
   bowl     (inverted=True):  spawn on the bottom platform, walk out = go UP.
+
+straight=True (24/11, teacher9): flights only along x, straight across the
+whole patch width, between side walls; no corners. On the square rings the
+policies climbed at the corners, where walking diagonally gives sqrt(2)
+longer treads and a gentler slope, and drifted off the straight eval
+staircase when not steered (plan step 3i).
 """
 
 from __future__ import annotations
@@ -57,6 +63,10 @@ class OpenRiserStairsTerrainCfg(SubTerrainCfg):
   """Flat frame around the stairs at floor level, in meters."""
   inverted: bool = False
   """False: pyramid (walk out = down). True: bowl (walk out = up)."""
+  straight: bool = False
+  """True: two straight flights along +-x between side walls, no corners."""
+  wall_thickness: float = 0.1
+  """Side walls of straight stairs, in meters."""
 
   def function(
     self, difficulty: float, spec: mujoco.MjSpec, rng: np.random.Generator
@@ -76,7 +86,8 @@ class OpenRiserStairsTerrainCfg(SubTerrainCfg):
       self.size[0] - 2 * self.border_width,
       self.size[1] - 2 * self.border_width,
     )
-    num_steps = max(0, int((min(inner) - self.platform_width) / (2 * run)))
+    span = inner[0] if self.straight else min(inner)
+    num_steps = max(0, int((span - self.platform_width) / (2 * run)))
     cx, cy = 0.5 * self.size[0], 0.5 * self.size[1]
 
     # Heights: the floor top is where the lowest walking surface sits.
@@ -126,8 +137,14 @@ class OpenRiserStairsTerrainCfg(SubTerrainCfg):
       else:
         a, b = k * run - (nosing if k > 0 else 0.0), (k + 1) * run
       depth = b - a
-      outer = (inner[0] - 2 * a, inner[1] - 2 * a)
       z = ring_top[k] - 0.5 * thick
+      if self.straight:
+        # One plate per side, across the full width between the walls.
+        off_x = 0.5 * inner[0] - a - 0.5 * depth
+        for s in (1, -1):
+          add_box((cx + s * off_x, cy, z), (0.5 * depth, 0.5 * inner[1], 0.5 * thick), rgba)
+        continue
+      outer = (inner[0] - 2 * a, inner[1] - 2 * a)
       off_y = 0.5 * inner[1] - a - 0.5 * depth
       off_x = 0.5 * inner[0] - a - 0.5 * depth
       # Front/back strips span the full ring width; left/right fill between.
@@ -143,13 +160,26 @@ class OpenRiserStairsTerrainCfg(SubTerrainCfg):
       # Top platform: also a plate, open underneath like the treads.
       side = (
         inner[0] - 2 * num_steps * run + 2 * nosing,
-        inner[1] - 2 * num_steps * run + 2 * nosing,
+        inner[1] if self.straight else inner[1] - 2 * num_steps * run + 2 * nosing,
       )
       add_box(
         (cx, cy, platform_top - 0.5 * thick),
         (0.5 * side[0], 0.5 * side[1], 0.5 * thick),
         brand_ramp(_STAIR_RGB, 1.0),
       )
+
+    if self.straight:
+      # Side walls along x from the floor to 0.5 m above the highest tread
+      # (inside the border, so they also close a bowl's sides above 0).
+      top = max(platform_top, 0.0) + 0.5
+      bottom = floor_top - _FLOOR_THICKNESS
+      wy = 0.5 * inner[1] - 0.5 * self.wall_thickness
+      for s in (1, -1):
+        add_box(
+          (cx, cy + s * wy, 0.5 * (top + bottom)),
+          (0.5 * inner[0], 0.5 * self.wall_thickness, 0.5 * (top - bottom)),
+          border_rgba,
+        )
 
     origin = np.array([cx, cy, platform_top])
     return TerrainOutput(origin=origin, geometries=geometries)
