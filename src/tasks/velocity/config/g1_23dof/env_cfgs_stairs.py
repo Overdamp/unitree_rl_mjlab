@@ -5,6 +5,7 @@ Its observations match Rough-Blind / Flat (actor 80, critic 95), so existing
 blind checkpoints play on it unchanged; that is the step-2 baseline.
 """
 
+import os
 from dataclasses import replace
 
 from mjlab.envs import ManagerBasedRlEnvCfg
@@ -31,7 +32,9 @@ from .rewards_stairs import (
   foothold_unsupported,
   progress_along_command,
 )
-from .stair_token import stair_profile_ray_cfg, stair_token
+from mjlab.utils.noise import GaussianNoiseCfg
+
+from .stair_token import TOKEN_NOISE_STD, stair_profile_ray_cfg, stair_token
 from .terrains_stairs import OpenRiserStairsTerrainCfg
 
 # Placeholders until the target staircase is measured (plan step 0).
@@ -266,4 +269,51 @@ def unitree_g1_23dof_open_stairs_teacher8_env_cfg(
   cfg.scene.sensors = cfg.scene.sensors + (stair_profile_ray_cfg(),)
   for group in ("actor", "critic"):
     cfg.observations[group].terms["stair_token"] = ObservationTermCfg(func=stair_token)
+  return cfg
+
+
+def unitree_g1_23dof_open_stairs_teacher7_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """(24/11) Clean control for teacher8 (plan step 3i): the clip-only teacher7
+  env as it was trained (teacher env minus foothold / stumble), plain PPO, no
+  AMP, no token. Resuming teacher7 here for as many iterations as teacher8
+  tells whether teacher8's gain came from the token or from more training
+  (the AMP run, the first control, used a different runner)."""
+  return _drop_foothold_stumble(unitree_g1_23dof_open_stairs_teacher_env_cfg(play=play))
+
+
+# teacher9 foothold weight; override with TEACHER9_FOOTHOLD_W (read when the
+# task registry imports this module, i.e. at train / play start).
+TEACHER9_FOOTHOLD_W = -3.0
+TEACHER9_TOKEN_DROPOUT = 0.1
+
+
+def unitree_g1_23dof_open_stairs_teacher9_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """teacher9 (plan step 3i): teacher8 + two changes, resumed from teacher8
+  (obs unchanged: actor 271, critic 286).
+  1. Foothold reward back at 3x teacher7_foothold's weight, WITHOUT the
+     stumble term. teacher8 still lands its sole centre 9.4 cm behind the
+     tread centre with the heel over the gap on 44% of touchdowns going up
+     10 cm (target: +-5 cm, < 15%). At -1 the term stayed flat at -0.072 per
+     episode; teacher7_foothold also had stumble -0.5, the likelier cause of
+     its stalling at edges.
+  2. Actor token noise (TOKEN_NOISE_STD) and 10% dropout to the flat token,
+     training only, to prepare for a student that estimates the token from
+     depth. The critic keeps the clean token.
+  """
+  cfg = unitree_g1_23dof_open_stairs_teacher8_env_cfg(play=play)
+  cfg.scene.sensors = cfg.scene.sensors + foot_sole_ray_cfgs()
+  weight = float(os.environ.get("TEACHER9_FOOTHOLD_W", TEACHER9_FOOTHOLD_W))
+  cfg.rewards["foothold"] = RewardTermCfg(
+    func=foothold_unsupported, weight=weight, params={"sensor_name": "feet_ground_contact"}
+  )
+  if not play:
+    cfg.observations["actor"].terms["stair_token"] = ObservationTermCfg(
+      func=stair_token,
+      params={"dropout": TEACHER9_TOKEN_DROPOUT},
+      noise=GaussianNoiseCfg(std=TOKEN_NOISE_STD),
+    )
   return cfg

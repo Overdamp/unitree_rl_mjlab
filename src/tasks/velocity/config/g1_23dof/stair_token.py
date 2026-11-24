@@ -34,6 +34,7 @@ placement needs.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 import torch
@@ -143,7 +144,38 @@ def stair_token_raw(env: ManagerBasedRlEnv, sensor_name: str = STAIR_TOKEN_SENSO
   return torch.stack([h, d, yaw, dist], dim=1)
 
 
-def stair_token(env: ManagerBasedRlEnv, sensor_name: str = STAIR_TOKEN_SENSOR) -> torch.Tensor:
-  """(B, 4) observation term: stair_token_raw scaled to roughly unit range."""
+# teacher9 (plan step 3i): per-value Gaussian noise on the ACTOR token, in
+# scaled units, from the paper's real-robot estimate errors (h 0.9 cm, d 1.1 cm,
+# yaw 3.9 deg; dist ~2 cm assumed): h 0.01 m x 10, d 0.011 m x 4, yaw 0.07 rad,
+# dist 0.02 m. Applied by the observation manager only when corruption is on
+# (training), so play / eval see the clean token.
+TOKEN_NOISE_STD = (0.1, 0.044, 0.07, 0.02)
+
+
+def _flat(raw: torch.Tensor) -> torch.Tensor:
+  """The token flat ground gives: no edge in range."""
+  out = torch.zeros_like(raw)
+  out[:, 3] = X_MAX
+  return out
+
+
+def stair_token(
+  env: ManagerBasedRlEnv,
+  sensor_name: str = STAIR_TOKEN_SENSOR,
+  dropout: float = 0.0,
+) -> torch.Tensor:
+  """(B, 4) observation term: stair_token_raw scaled to roughly unit range.
+  dropout > 0 (training only, teacher9) replaces the token of that share of
+  envs, redrawn every step, with the flat-ground token: a depth estimator that
+  misses the stairs, so the policy must keep using the height scan too."""
   raw = stair_token_raw(env, sensor_name)
+  if dropout > 0.0:
+    drop = torch.rand(raw.shape[0], 1, device=raw.device) < dropout
+    raw = torch.where(drop, _flat(raw), raw)
+  ablate = os.environ.get("STAIR_TOKEN_ABLATE", "")
+  if ablate == "flat":
+    # Eval-only ablation: always report "no edge in range" (what flat ground gives).
+    raw = _flat(raw)
+  elif ablate:
+    raise ValueError(f"STAIR_TOKEN_ABLATE={ablate!r}: only 'flat' is supported")
   return raw * torch.tensor(TOKEN_SCALE, device=raw.device, dtype=raw.dtype)
