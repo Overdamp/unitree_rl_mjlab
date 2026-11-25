@@ -14,6 +14,7 @@ from .env_cfgs_stairs import (
   unitree_g1_23dof_open_stairs_teacher7_env_cfg,
   unitree_g1_23dof_open_stairs_teacher8_env_cfg,
   unitree_g1_23dof_open_stairs_teacher9_env_cfg,
+  unitree_g1_23dof_open_stairs_teacher9b_env_cfg,
 )
 from .rl_cfg import (
   unitree_g1_23dof_amp_ppo_runner_cfg,
@@ -98,6 +99,14 @@ register_mjlab_task(
   task_id="Unitree-G1-23Dof-OpenStairs-Teacher9",
   env_cfg=unitree_g1_23dof_open_stairs_teacher9_env_cfg(),
   play_env_cfg=unitree_g1_23dof_open_stairs_teacher9_env_cfg(play=True),
+  rl_cfg=unitree_g1_23dof_stairs_ppo_runner_cfg(),
+  runner_cls=VelocityOnPolicyRunner,
+)
+
+register_mjlab_task(
+  task_id="Unitree-G1-23Dof-OpenStairs-Teacher9b",
+  env_cfg=unitree_g1_23dof_open_stairs_teacher9b_env_cfg(),
+  play_env_cfg=unitree_g1_23dof_open_stairs_teacher9b_env_cfg(play=True),
   rl_cfg=unitree_g1_23dof_stairs_ppo_runner_cfg(),
   runner_cls=VelocityOnPolicyRunner,
 )

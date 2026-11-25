@@ -27,6 +27,7 @@ LOGS=logs/rsl_rl/g1_23dof_velocity
 FROM="${FROM:-*_stairs_teacher8}"
 ITERS="${ITERS:-3000}"
 RUN_NAME="${RUN_NAME:-stairs_teacher9}"
+TASK="${TASK:-Unitree-G1-23Dof-OpenStairs-Teacher9}"
 export TEACHER9_FOOTHOLD_W="${TEACHER9_FOOTHOLD_W:--3.0}"
 
 LOAD_RUN="$(ls -d "$LOGS"/$FROM 2>/dev/null | sort | tail -n 1 | xargs -r -n1 basename)"
@@ -39,9 +40,9 @@ if [ ! -f "$LOGS/$LOAD_RUN/$CKPT" ]; then
   echo "Checkpoint $LOGS/$LOAD_RUN/$CKPT not found" >&2
   exit 1
 fi
-echo "Resuming $LOAD_RUN/$CKPT for $ITERS iterations as $RUN_NAME (foothold weight $TEACHER9_FOOTHOLD_W)"
+echo "Resuming $LOAD_RUN/$CKPT into $TASK for $ITERS iterations as $RUN_NAME"
 
-python scripts/train.py Unitree-G1-23Dof-OpenStairs-Teacher9 \
+python scripts/train.py "$TASK" \
   --env.scene.num-envs=4096 \
   --agent.resume=True \
   --agent.load-run="^${LOAD_RUN}\$" \

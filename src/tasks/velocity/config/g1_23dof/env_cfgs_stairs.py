@@ -355,3 +355,32 @@ def unitree_g1_23dof_open_stairs_teacher9_env_cfg(
       noise=GaussianNoiseCfg(std=TOKEN_NOISE_STD),
     )
   return cfg
+
+
+# teacher9b: robots on a straight flight whose command points at a side wall
+# stop ~3 m out; teacher9 demoted them (mjlab wants half the commanded
+# distance, ~5 m), so its curriculum sat at ~2.5 (~6 cm rises).
+TEACHER9B_DEMOTE_MAX_M = 2.0
+
+
+def unitree_g1_23dof_open_stairs_teacher9b_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """teacher9b (plan step 3i): teacher9 without the foothold reward and with a
+  capped demotion distance; resumed from teacher8 (obs unchanged).
+  teacher9 (25/11) stalled in front of the first step (up 10 cm hold: 97% ->
+  4%, steps median 0; wz0 up 3 cm 12.5%): the foothold penalty is only paid
+  standing ON stairs, so standing before them was cheaper, the same failure
+  as teacher7_foothold (so not the stumble term), and its curriculum sat at
+  ~2.5 (see TEACHER9B_DEMOTE_MAX_M). Kept: straight flights + Chebyshev
+  promotion, actor token noise + dropout.
+  """
+  cfg = unitree_g1_23dof_open_stairs_teacher9_env_cfg(play=play)
+  del cfg.rewards["foothold"]
+  cfg.scene.sensors = tuple(s for s in cfg.scene.sensors if not s.name.endswith("_sole_rays"))
+  if "terrain_levels" in cfg.curriculum:
+    cfg.curriculum["terrain_levels"].params = {
+      **cfg.curriculum["terrain_levels"].params,
+      "demote_max_m": TEACHER9B_DEMOTE_MAX_M,
+    }
+  return cfg
