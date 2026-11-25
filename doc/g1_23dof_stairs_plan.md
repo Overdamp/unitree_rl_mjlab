@@ -293,3 +293,44 @@ resume แบบไม่เทรนใหม่: `expand_checkpoint_obs.py` �
 - รัน (DGX): `./run_stairs_teacher8.sh` (teacher7 model_27499 → 3000 iteration, run `stairs_teacher8`)
 - ความเสี่ยง: policy อาจไม่ใช้ token เพราะ teacher7 พึ่ง height scan อยู่แล้ว · ตรวจด้วย ablation (ใส่ token ผิด แล้วดูว่าการวางเท้าเปลี่ยนไหม) · ถ้าไม่ใช้: `NOISE=0.01` หรือเทรนนานขึ้น
 - เป้าเดิม: ขึ้น 10 cm ≥ 80%, กลางเท้าเยื้อง ≤ ±5 cm, ส้นล้นขอบ < 15% · eval: `--task Unitree-G1-23Dof-OpenStairs-Teacher8`
+
+ผล teacher8 (24/11, run `2026-11-24_10-58-19_stairs_teacher8`, model_30498; ตัวเทียบ = teacher7_amp ที่เริ่มจุดเดียวกันและเทรนนานเท่ากัน): heading hold ขึ้น 10 / 12 cm (128 env) **96.9 / 92.2%** (amp 81.2 / 46.9) · ขึ้น 15 cm 52% (amp 3%) · ลง 18 cm 97% · wz = 0 ขึ้น 10 cm 23% · กลางเท้า −9.4 cm, ส้นล้นขอบ 44% (amp −14.1 / 54%) · ablation (`STAIR_TOKEN_ABLATE=flat`) ขึ้น 10 / 12 cm ยังได้ 94.5 / 91.4% → actor แทบไม่พึ่ง token ตอนเดิน · ผลดิบ `step3h_teacher8_30498_vx0.5{,_hold}.jsonl`
+
+### ขั้น 3i: teacher9 / teacher9b (24–25/11/2026) — ไม่ผ่าน
+
+- **teacher9** (resume teacher8): foothold −3 (ไม่มี stumble) + token noise / dropout + บันไดตรงมีผนัง 50% + curriculum แบบ Chebyshev · ผล: หยุดยืนหน้าขั้นแรก ขึ้น 10 cm hold 97 → **4%** · `terrain_levels` ค้าง ~2.5 (~6 cm) ตลอด run · สาเหตุ: (1) foothold ปรับเฉพาะตอนยืนบนขั้น → ยืนหน้าบันไดคุ้มกว่า (เหมือน teacher7_foothold จึงไม่ใช่ความผิดของ stumble) (2) เกณฑ์ลดระดับของ mjlab (เดินไม่ถึงครึ่งของระยะที่สั่ง ~5 m) ลดระดับหุ่นบนบันไดตรงที่ผนังขวาง
+- **teacher9b** (resume teacher8): teacher9 ไม่มี foothold + เพดานลดระดับ 2 m · `terrain_levels` 4.36 (แก้ curriculum ได้) · hold ขึ้น 10 / 12 / 15 cm 96 / 76 / 31% (แย่กว่า teacher8 ที่ขั้นสูง) · **wz = 0 ขึ้น 10 cm 22% (ไม่ดีขึ้น)** · ผลดิบ `step3i_teacher9{,b}_33497_vx0.5{,_hold}.jsonl`
+- **สาเหตุจริงที่ขึ้นตรงไม่ได้** (วัด yaw ตอน wz = 0 ขึ้น 10 cm, ขอบแรก x = 1.04 m): ที่ 2 s |yaw| median 15° → ที่ 4 s (ถึงขอบ) **91°** (98% ของหุ่นหันเกิน 29°) ความเร็วเดินหน้ายัง 0.5 m/s = หุ่น**หันหนีขั้นแล้วเดินเลียบ** ไม่ได้ล้มหรือหยุด · teacher8 อาการเดียวกัน · เพราะ track_linear_velocity และ progress วัดใน body frame → "เดินหน้า" ได้คะแนนเต็มไม่ว่าหันไปทางไหน · วัดกับ teacher8: progress ตอนหันหนี 0.91 **มากกว่า**ตอนหันเข้าบันได 0.82 · การไปขึ้นที่มุมบันไดวงเป็นอาการเดียวกัน (หาทางง่ายแล้วยังได้ reward เต็ม)
+- บนพื้นราบ wz = 0 หุ่นก็ค่อยๆ หันเอง ~56° ใน 14 s → deploy ต้องมีตัวคุม heading (คนบังคับ หรือ heading hold จาก IMU yaw ในโค้ด deploy ที่เป็นไฟล์ร่วม)
+
+ตัดสินใจ: หยุดสาย resume (teacher3 → 9b ต่อกันมา นิสัยหันหนีฝังอยู่ และ curriculum เริ่มใหม่ทุกครั้งที่ resume) → เทรนใหม่ตั้งแต่ศูนย์ด้วยกฎที่เรียนมา (ขั้น 4)
+
+## ขั้น 4: teacher-v2 เทรนใหม่ตั้งแต่ศูนย์ (25/11/2026)
+
+ไฟล์: `env_cfgs_stairs_v2.py` (กฎทั้งหมดในที่เดียว เริ่มจาก rough env ไม่ต่อจาก teacher env เดิม) · `heading_lock.py` · task `Unitree-G1-23Dof-OpenStairs-TeacherV2` · obs = actor 271 / critic 286 (เรียงเหมือน teacher8: proprio + height scan + stair token) ตั้งแต่ต้น ไม่ต้องผ่าตัด checkpoint
+
+กฎ (รหัสตรงกับ docstring ของ `env_cfgs_stairs_v2.py`):
+
+| รหัส | กฎ | มาจาก |
+|---|---|---|
+| R1 | เริ่มที่ terrain แถวง่ายสุด (`max_init_terrain_level = 1`) | teacher1 |
+| R2 | คำสั่งช่วงเดียวตามที่ deploy ส่งได้ (vx −0.5..1.0, vy ±0.5, wz ±1) | teacher1 |
+| R3 | foot clearance วัดจากพื้นใต้เท้า ปรับเฉพาะยกต่ำ | teacher2/3 |
+| R4 | track_angular_velocity w 2.0 | teacher3 |
+| R5 | pose std hip pitch / knee = 1.0 ตอนเดิน | teacher4 |
+| R6 | is_terminated −100 | teacher5 |
+| R7 | progress แบบ linear (ยืนเฉยได้ 0) | teacher6 |
+| R8 | stair token ใน obs; ฝั่ง actor มี noise (h 1 cm, d 1.1 cm, yaw 4°, dist 2 cm) + dropout 10% เป็น "ไม่มีขอบ" | teacher8/9b |
+| R9 | terrain: บันไดวง 60% + บันไดตรงมีผนัง 30% + พื้นราบ 10% · เลื่อนระดับด้วย Chebyshev distance · ลดระดับเพดาน 2 m | teacher9/9b |
+| **N1** | **track_linear_velocity และ progress วัดใน world frame เทียบทิศอ้างอิงที่หุ่นขยับเองไม่ได้** (heading env: heading_target; wz env: yaw ตอน resample + อินทิกรัล wz ที่สั่ง) · ไม่ปรับความเร็วแนวดิ่ง (ขึ้นขั้นต้องมี) | วิเคราะห์ 25/11 |
+| **N2** | heading drift `1 − cos(yaw − ref)` w −0.5 (ต่ำกว่า progress เพื่อไม่ให้ยืนนิ่งคุ้มกว่า) | วิเคราะห์ 25/11 |
+| **N3** | heading-command envs 80% (mjlab 30%) → หันหนีแล้วคำสั่ง wz ดึงกลับตลอด | วิเคราะห์ 25/11 |
+| ตัดออก | foothold / stumble แบบลงโทษ (หยุดหน้าขั้น 2 ครั้ง) · AMP กับคลิปพื้นราบ (discriminator พัง) | 3g, 3i |
+
+ตรวจ N1 ก่อนเทรน (teacher8 บน env v2, wz = 0 ขึ้น 10 cm): progress body / **locked** ตอนหันเข้าบันได 0.82 / 0.81 · ตอนหันหนีเกิน 60° 0.91 / **0.08** · tracking body / **locked** 0.81 / **0.11** → reward ใหม่ไม่ให้คะแนนการหันหนีแล้ว · smoke test (64 env) และ `RESUME=1` ผ่าน
+
+- รัน (DGX): `./run_stairs_teacher_v2.sh` (30000 iteration, run `stairs_teacher_v2`, ~2 วัน) · ถ้าเครื่องล่ม: `RESUME=1 ./run_stairs_teacher_v2.sh`
+- เช็กระหว่างทางทุก ~5000 iteration: `./eval_stairs_quick.sh Unitree-G1-23Dof-OpenStairs-TeacherV2 <run>/model_N.pt` (ขึ้น 8/10/12 cm แบบ wz = 0 และ hold, ~5 นาที; teacher8 ได้ wz0 31 / 20 / 17%, hold 97 / 98 / 92%)
+- **เป้า (ตั้งไว้ก่อนดูผล):** wz = 0 ขึ้น 10 cm ≥ 80% (ตัวหลัก) · hold ขึ้น 10 / 12 cm ≥ teacher8 (97 / 92%) · กลางเท้า ±5 cm, ส้นล้นขอบ < 15% (รอง)
+- ดูระหว่างเทรน: `Metrics/twist/heading_drift` ควรลดลง · `terrain_levels` ควรไต่ขึ้นต่อเนื่อง · ถ้า `progress` ต่ำและ `stand_still` สูงนาน = หยุดหน้าขั้น → ลด `V2_HEADING_DRIFT_W`
+- ความเสี่ยง: ขนาดบันไดจริงยังไม่ได้วัด (tread 0.25–0.32 m, rise 2–18 cm เป็นค่าสมมติ) · เรื่องวางเท้ายังไม่มีกฎ (ถ้า v2 ขึ้นตรงได้แล้ว ค่อยลอง reward บวกตามระยะจากกลางขั้น)
