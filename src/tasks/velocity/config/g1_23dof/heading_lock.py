@@ -9,16 +9,26 @@ measure velocity in the BODY frame, so "walk forward" is fully paid in
 whatever direction the robot faces: turning away from a step costs only a
 moment of yaw-rate error, climbing it risks a fall.
 
-Fix: score walking against a reference heading that the ROBOT cannot move.
-  heading envs  ref = heading_target (world, fixed until the next resample);
-                the command's wz = k * (target - yaw) also keeps pushing
-                back while the robot faces away, so turning away is costly
-                for as long as it lasts.
-  wz envs       ref = robot heading at the resample + the integral of the
-                commanded wz since then.
+Fix: score walking against a reference heading `ref` that the ROBOT cannot
+move once it is set.
+  heading envs  ref follows the robot while it turns toward the new target;
+                once |target - yaw| < LOCK_TOL, ref = heading_target until
+                the next resample. Turning away after that is not paid, and
+                the command's wz = k * (target - yaw) keeps pushing back.
+  wz envs and   ref = robot heading at the resample + the integral of the
+  standing      commanded wz, pulled toward the robot heading with time
+                constant LEAK_TAU_S (imperfect wz tracking must not pile up
+                into an error the policy cannot see; a fast turn away still
+                costs).
 The intended world velocity is the body-frame command rotated by ref; the
 rewards compare the world velocity with that. The policy obs (the 3-value
 command) is unchanged, so deploy is unchanged.
+
+v2 run 1 (25-26/11, stopped at 10k): ref jumped to a new heading target AT
+the resample, so with the target behind it "walk forward 0.8 m/s" was scored
+as walking backward while the robot turned (up to ~3 s), toward a direction
+the policy cannot see. Falls outnumbered timeouts 6.25 : 1.54, episodes 522
+steps (teacher2/3 at the same stage: 0.75 : 3.8, ~930), pose reward 0.001.
 """
 
 from __future__ import annotations
@@ -34,26 +44,40 @@ from mjlab.tasks.velocity.mdp.velocity_command import UniformVelocityCommand
 from mjlab.utils.lab_api.math import wrap_to_pi
 
 
+# Heading envs lock ref to the target once the robot faces it within this.
+LOCK_TOL = 0.26  # rad, ~15 deg
+# wz / standing envs: ref relaxes toward the robot heading with this constant.
+LEAK_TAU_S = 2.0
+
+
 class HeadingLockedVelocityCommand(UniformVelocityCommand):
   cfg: HeadingLockedVelocityCommandCfg
 
   def __init__(self, cfg: HeadingLockedVelocityCommandCfg, env: ManagerBasedRlEnv):
     super().__init__(cfg, env)
     self.ref_yaw = torch.zeros(self.num_envs, device=self.device)
+    self.locked = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
     self.metrics["heading_drift"] = torch.zeros(self.num_envs, device=self.device)
 
   def _resample_command(self, env_ids: torch.Tensor) -> None:
     super()._resample_command(env_ids)
     self.ref_yaw[env_ids] = self.robot.data.heading_w[env_ids]
+    self.locked[env_ids] = False
 
   def _update_command(self) -> None:
     super()._update_command()
-    # wz envs: follow the commanded turn rate (standing envs: wz = 0).
-    self.ref_yaw = wrap_to_pi(self.ref_yaw + self.vel_command_b[:, 2] * self._env.step_dt)
+    dt = self._env.step_dt
+    yaw = self.robot.data.heading_w
+    # wz / standing envs: commanded turn rate, leaking toward the robot heading.
+    ref = self.ref_yaw + self.vel_command_b[:, 2] * dt
+    ref = ref + wrap_to_pi(yaw - ref) * (dt / LEAK_TAU_S)
     if self.cfg.heading_command:
-      # A standing env is told wz = 0, so it keeps its resample heading.
-      locked = self.is_heading_env & ~self.is_standing_env
-      self.ref_yaw = torch.where(locked, self.heading_target, self.ref_yaw)
+      # A standing env is told wz = 0, so it is treated like a wz env.
+      steer = self.is_heading_env & ~self.is_standing_env
+      faces = wrap_to_pi(self.heading_target - yaw).abs() < LOCK_TOL
+      self.locked |= steer & faces
+      ref = torch.where(steer, torch.where(self.locked, self.heading_target, yaw), ref)
+    self.ref_yaw = wrap_to_pi(ref)
 
   def _update_metrics(self) -> None:
     super()._update_metrics()
