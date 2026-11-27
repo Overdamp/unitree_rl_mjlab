@@ -356,3 +356,32 @@ run `stairs_teacher_v2` แรก (DGX) ที่ iteration 10131: ล้ม : �
 หันหนียังได้ 0.22 เพราะ wz env 20% ที่ ref ไหลตามหุ่น (env ที่ล็อกแล้ว 80% ได้ ~0) · smoke test ผ่าน · เริ่มเทรนใหม่จากศูนย์ (`./run_stairs_teacher_v2.sh`)
 
 เช็กช่วงแรก: ~2000 iteration ล้ม : หมดเวลา ควรใกล้ teacher2/3 (หมดเวลามากกว่าล้ม) · episode > 800 step · pose > 0.3 · ถ้ายังเหมือน run 1 ให้หยุดเร็ว
+
+### Step 4 run 2 (teacher-v2, from scratch after the lock fix; power cut at ~2150, resumed from model_2100)
+Quick eval of model_15000 (64 envs, 7 steps up, success %):
+
+| | 8 cm | 10 cm | 12 cm |
+|---|---|---|---|
+| wz0 teacher-v2 | **81.2** | **84.4** | **78.1** |
+| wz0 teacher8 | 31 | 20 | 17 |
+| hold teacher-v2 | 85.9 | 70.3 | 84.4 |
+| hold teacher8 | 97 | 98 | 92 |
+
+Straight climbing at wz = 0 reaches the step-4 target (>= 80% at 10 cm): the heading-locked
+rewards fixed the turn-away. **But the posture is unusable**: walking flat at vx 0.5 it twists
+the waist +1.78 rad, raises both arms (shoulder pitch +1.2), bends the knees 1.1 rad (pelvis
+0.66 m instead of 0.77). model_2100 was still normal. The shared pose reward
+exp(-mean(err^2/std^2)) is ~exp(-6) there, so there is no gradient back (log: pose 0.0015).
+
+### Step 4b: teacher-v2b (posture.py)
+Two penalties that grow with the error. Measured at vx 0.5, flat / up 12 cm:
+
+| | model_2100 | model_15000 |
+|---|---|---|
+| upper-body sum dq^2 (waist + arms) | 0.14 / 0.28 | 11.9 / 12.2 |
+| pelvis above mean foot z, m | 0.755 / 0.734 | 0.640 / 0.636 |
+
+- N4 `upper_body_deviation` -0.5 x sum dq^2 (normal -0.07, twisted -6)
+- N5 `pelvis_height` -20 x max(0, 0.70 - h)
+- Fine-tune model_15000 for 5000 iterations, terrain starting at level <= 3
+  (`run_stairs_teacher_v2b.sh`). If posture returns but wz0 drops a lot: from scratch with N4/N5.

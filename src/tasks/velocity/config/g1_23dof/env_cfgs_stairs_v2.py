@@ -24,7 +24,7 @@ Rules, with the run that showed each one:
   R8  stair token in obs, actor copy noisy + 10% dropout            teacher8/9b
   R9  half-wall-free terrain mix incl. straight flights, Chebyshev
       promotion, demotion capped at 2 m                             teacher9/9b
-  NEW
+  NEW (v2b adds N4, N5 below)
   N1  linear tracking and progress in a heading-locked world frame,
       no vertical-velocity error                                     diag 25/11
   N2  heading drift penalty (small)                                 diag 25/11
@@ -34,6 +34,7 @@ Rules, with the run that showed each one:
   AMP with a flat-ground clip: discriminator collapse          teacher7_amp
 """
 
+import os
 from dataclasses import replace
 
 from mjlab.envs import ManagerBasedRlEnvCfg
@@ -57,6 +58,7 @@ from .heading_lock import (
   progress_locked,
   track_linear_velocity_locked,
 )
+from .posture import joint_deviation_l2, pelvis_height_below
 from .rewards_stairs import feet_clearance_terrain, foot_ground_ray_cfgs
 from .stair_token import TOKEN_NOISE_STD, stair_profile_ray_cfg, stair_token
 from .terrains_stairs import OpenRiserStairsTerrainCfg
@@ -169,4 +171,37 @@ def unitree_g1_23dof_open_stairs_teacher_v2_env_cfg(
       params={"dropout": V2_TOKEN_DROPOUT},
       noise=GaussianNoiseCfg(std=TOKEN_NOISE_STD),
     )
+  return cfg
+
+
+# teacher-v2b (plan step 4, 27/11/2026). Measured walking at vx 0.5 (flat /
+# up 12 cm, 64 envs): model_2100 (posture still normal) upper-body sum dq^2
+# 0.14 / 0.28, pelvis above the feet 0.755 / 0.734 m; model_15000 (twisted,
+# arms up, crouched) 11.9 / 12.2 and 0.640 / 0.636 m.
+# N4: -0.5 x 0.14 = -0.07 when normal, -6 when twisted (progress pays <= 1).
+V2B_UPPER_BODY_W = float(os.environ.get("V2B_UPPER_BODY_W", "-0.5"))
+# N5: between normal (0.73-0.755) and crouched (0.64); -20 x 0.06 m = -1.2.
+V2B_MIN_PELVIS_H = 0.70
+V2B_PELVIS_H_W = float(os.environ.get("V2B_PELVIS_H_W", "-20.0"))
+# Fine-tuning a robot that already climbs: start a little higher than R1 so
+# the reset curriculum (levels are not in the checkpoint) has less to redo.
+V2B_INIT_LEVEL = int(os.environ.get("V2B_INIT_LEVEL", "1"))
+
+
+def unitree_g1_23dof_open_stairs_teacher_v2b_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """teacher-v2 + N4 upper-body deviation penalty + N5 pelvis height floor
+  (posture.py). Same observations, so a teacher-v2 checkpoint loads as is."""
+  cfg = unitree_g1_23dof_open_stairs_teacher_v2_env_cfg(play=play)
+  assert cfg.scene.terrain is not None
+  cfg.scene.terrain.max_init_terrain_level = V2B_INIT_LEVEL
+  cfg.rewards["upper_body_deviation"] = RewardTermCfg(            # N4
+    func=joint_deviation_l2, weight=V2B_UPPER_BODY_W, params={}
+  )
+  cfg.rewards["pelvis_height"] = RewardTermCfg(                   # N5
+    func=pelvis_height_below,
+    weight=V2B_PELVIS_H_W,
+    params={"min_height": V2B_MIN_PELVIS_H},
+  )
   return cfg
